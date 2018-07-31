@@ -72,10 +72,18 @@ namespace Microsoft.ML.Runtime.Sweeper
             throw _host.Except("Requested metric '{0}' does not exist. Options are:\n{1}", userMetric, sb.ToString());
         }
 
-        public IRunResult GetRunResult(ParameterSet parameterSet, string resultFileName)
+        public IRunResult GetRunResult(IChannel ch, ParameterSet parameterSet, string resultFileName)
         {
             Double result;
-            ResultProcessor.ResultProcessor.ProcessResultLines(resultFileName, _metric, out result);
+            try {
+                ResultProcessor.ResultProcessor.ProcessResultLines(resultFileName, _metric, out result);
+            }
+            catch (Exception e)
+            {
+                ch.Warning($"ResultsProcessor error while processing {resultFileName}. Exception: {e}");
+                result = 0;
+            }
+
             if (result == 0)
                 return new RunResult(parameterSet);
 

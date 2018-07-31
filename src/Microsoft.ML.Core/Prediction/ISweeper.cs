@@ -77,7 +77,7 @@ namespace Microsoft.ML.Runtime
         /// <summary>
         /// Return an IRunResult based on the results given as a TResults object.
         /// </summary>
-        IRunResult GetRunResult(ParameterSet parameters, TResults results);
+        IRunResult GetRunResult(IChannel ch, ParameterSet parameters, TResults results);
     }
 
     /// <summary>

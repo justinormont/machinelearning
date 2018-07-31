@@ -214,7 +214,7 @@ namespace Microsoft.ML.Runtime.Sweeper
                 }
             });
             return sweeps.Select((sweep, j) =>
-                ResultProcessor.GetRunResult(sweep, string.Format(@"{0}\{1}.out.txt", OutputFolder, min + j)));
+                ResultProcessor.GetRunResult(ch, sweep, string.Format(@"{0}\{1}.out.txt", OutputFolder, min + j)));
         }
 
         /// <summary>
