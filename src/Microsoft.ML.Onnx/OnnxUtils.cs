@@ -306,7 +306,7 @@ namespace Microsoft.ML.Runtime.Model.Onnx
             switch (rawKind)
             {
                 case DataKind.BL:
-                    dataType = TensorProto.Types.DataType.Float;
+                    dataType = TensorProto.Types.DataType.Bool;
                     break;
                 case DataKind.TX:
                     dataType = TensorProto.Types.DataType.String;
@@ -327,7 +327,7 @@ namespace Microsoft.ML.Runtime.Model.Onnx
                     dataType = TensorProto.Types.DataType.Int32;
                     break;
                 case DataKind.U4:
-                    dataType = TensorProto.Types.DataType.Int64;
+                    dataType = TensorProto.Types.DataType.Uint32;
                     break;
                 case DataKind.I8:
                     dataType = TensorProto.Types.DataType.Int64;
