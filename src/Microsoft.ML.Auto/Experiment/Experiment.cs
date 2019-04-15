@@ -13,6 +13,7 @@ namespace Microsoft.ML.Auto
     internal class Experiment<TRunDetail, TMetrics> where TRunDetail : RunDetail
     {
         private readonly MLContext _context;
+        private readonly IDataView _data;
         private readonly OptimizingMetricInfo _optimizingMetricInfo;
         private readonly TaskKind _task;
         private readonly IProgress<TRunDetail> _progressCallback;
@@ -24,8 +25,8 @@ namespace Microsoft.ML.Auto
         private readonly IRunner<TRunDetail> _runner;
         private readonly IList<SuggestedPipelineRunDetail> _history = new List<SuggestedPipelineRunDetail>();
 
-
         public Experiment(MLContext context,
+            IDataView data,
             TaskKind task,
             OptimizingMetricInfo metricInfo,
             IProgress<TRunDetail> progressCallback,
@@ -36,6 +37,7 @@ namespace Microsoft.ML.Auto
             IRunner<TRunDetail> runner)
         {
             _context = context;
+            _data = data;
             _optimizingMetricInfo = metricInfo;
             _task = task;
             _progressCallback = progressCallback;
@@ -58,7 +60,7 @@ namespace Microsoft.ML.Auto
 
                 // get next pipeline
                 var getPiplelineStopwatch = Stopwatch.StartNew();
-                var pipeline = PipelineSuggester.GetNextInferredPipeline(_context, _history, _datasetColumnInfo, _task, _optimizingMetricInfo.IsMaximizing, _trainerWhitelist, _experimentSettings.CacheBeforeTrainer);
+                var pipeline = PipelineSuggester.GetNextInferredPipeline(_context, _data, _history, _datasetColumnInfo, _task, _optimizingMetricInfo.IsMaximizing, _trainerWhitelist, _experimentSettings.CacheBeforeTrainer);
                 var pipelineInferenceTimeInSeconds = getPiplelineStopwatch.Elapsed.TotalSeconds;
 
                 // break if no candidates returned, means no valid pipeline available

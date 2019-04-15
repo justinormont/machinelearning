@@ -10,7 +10,7 @@ namespace Microsoft.ML.Auto
     public abstract class ExperimentBase<TMetrics> where TMetrics : class
     {
         protected readonly MLContext Context;
-
+        private IDataView _dataSample;
         private readonly IMetricsAgent<TMetrics> _metricsAgent;
         private readonly OptimizingMetricInfo _optimizingMetricInfo;
         private readonly ExperimentSettings _settings;
@@ -80,6 +80,7 @@ namespace Microsoft.ML.Auto
                 trainData = splitResult.trainData;
                 validationData = splitResult.validationData;
             }
+            _dataSample = trainData;
             return ExecuteTrainValidate(trainData, columnInformation, validationData, preFeaturizer, progressHandler);
         }
 
@@ -173,7 +174,7 @@ namespace Microsoft.ML.Auto
             where TRunDetail : RunDetail
         {
             // Execute experiment & get all pipelines run
-            var experiment = new Experiment<TRunDetail, TMetrics>(Context, _task, _optimizingMetricInfo, progressHandler,
+            var experiment = new Experiment<TRunDetail, TMetrics>(Context, _dataSample, _task, _optimizingMetricInfo, progressHandler,
                 _settings, _metricsAgent, _trainerWhitelist, columns, runner);
 
             return experiment.Execute();

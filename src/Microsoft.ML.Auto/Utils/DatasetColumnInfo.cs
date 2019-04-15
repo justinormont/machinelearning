@@ -12,13 +12,15 @@ namespace Microsoft.ML.Auto
         public readonly DataViewType Type;
         public readonly ColumnPurpose Purpose;
         public readonly ColumnDimensions Dimensions;
+        public readonly bool? IsNormalized;
 
-        public DatasetColumnInfo(string name, DataViewType type, ColumnPurpose purpose, ColumnDimensions dimensions)
+        public DatasetColumnInfo(string name, DataViewType type, ColumnPurpose purpose, ColumnDimensions dimensions, bool? isNormalized = null)
         {
             Name = name;
             Type = type;
             Purpose = purpose;
             Dimensions = dimensions;
+            IsNormalized = isNormalized;
         }
     }
 
@@ -32,7 +34,7 @@ namespace Microsoft.ML.Auto
             for (var i = 0; i < cols.Length; i++)
             {
                 var schemaCol = data.Schema[i];
-                var col = new DatasetColumnInfo(schemaCol.Name, schemaCol.Type, purposes[i].Purpose, colDimensions[i]);
+                var col = new DatasetColumnInfo(schemaCol.Name, schemaCol.Type, purposes[i].Purpose, colDimensions[i], schemaCol.IsNormalized());
                 cols[i] = col;
             }
             return cols;
