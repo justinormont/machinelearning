@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.ML.Data;
 
 namespace Microsoft.ML.Auto
@@ -51,9 +52,20 @@ namespace Microsoft.ML.Auto
             // If an IDataView is supplied, check if each column needs normalization
             if (data != null)
             {
-                var e = transforms.GetEnumerator();
-                while (e.MoveNext()) { };
-                var preview = e.Current.Estimator.Preview(data);
+                IEstimator<ITransformer> pipeline = new EstimatorChain<ITransformer>();
+
+                // Append each transformer to the pipeline
+                foreach (var transform in transforms)
+                {
+                    if (transform.Estimator != null)
+                    {
+                        pipeline = pipeline.Append(transform.Estimator);
+                    }
+                }
+
+                //var preview = transforms.Last().Estimator.Preview(data);
+                //var preview = pipeline.GetOutputSchema(data.Schema);
+                var preview = pipeline.Preview(data);
 
                 if (columnNames?.Length > 0)
                 {
@@ -78,8 +90,6 @@ namespace Microsoft.ML.Auto
                 var transform = NormalizingExtension.CreateSuggestedTransform(context, columnName, columnName);
                 transforms.Add(transform);
             }
-
-
         }
 
         private static bool ShouldCacheBeforeTrainer(TrainerInfo trainerInfo, bool? enableCaching)
