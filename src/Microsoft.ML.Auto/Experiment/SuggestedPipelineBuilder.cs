@@ -63,20 +63,14 @@ namespace Microsoft.ML.Auto
                     }
                 }
 
-                //var preview = transforms.Last().Estimator.Preview(data);
-                //var preview = pipeline.GetOutputSchema(data.Schema);
                 var preview = pipeline.Preview(data);
 
-                if (columnNames?.Length > 0)
+                foreach (string columnName in columnNames)
                 {
-                    foreach (string columnName in columnNames)
+                    if (!preview.Schema[columnName].IsNormalized())
                     {
-                        if (!preview.Schema[columnName].IsNormalized())
-                        {
-                            columnNamesToNormalize.Add(columnName);
-                        }
+                        columnNamesToNormalize.Add(columnName);
                     }
-
                 }
             }
             else
