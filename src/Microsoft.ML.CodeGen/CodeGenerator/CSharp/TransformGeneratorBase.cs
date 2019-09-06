@@ -2,9 +2,10 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Collections.Generic;
 using Microsoft.ML.AutoML;
 
-namespace Microsoft.ML.CLI.CodeGenerator.CSharp
+namespace Microsoft.ML.CodeGenerator.CSharp
 {
     /// <summary>
     /// Supports generation of code for trainers (Binary,Multi,Regression)
@@ -21,6 +22,7 @@ namespace Microsoft.ML.CLI.CodeGenerator.CSharp
 
         protected string[] OutputColumns;
 
+        protected IDictionary<string, object> Properties;
         /// <summary>
         /// Generates an instance of TrainerGenerator
         /// </summary>
@@ -28,6 +30,7 @@ namespace Microsoft.ML.CLI.CodeGenerator.CSharp
         protected TransformGeneratorBase(PipelineNode node)
         {
             Initialize(node);
+            Properties = node.Properties;
         }
 
         private void Initialize(PipelineNode node)

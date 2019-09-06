@@ -308,7 +308,10 @@ namespace Microsoft.ML.AutoML
                         string columnDestRenamed = $"{columnNameSafe}{columnDestSuffix}";
 
                         featureCols.Add(columnDestRenamed);
-                        yield return ImageFeaturizingExtension.CreateSuggestedTransform(Context, columnNameSafe, columnDestRenamed);
+                        yield return ImageLoadingExtension.CreateSuggestedTransform(Context, columnNameSafe, columnDestRenamed);
+                        yield return ImageResizingExtension.CreateSuggestedTransform(Context, columnDestRenamed, columnDestRenamed);
+                        yield return PixelExtractingExtension.CreateSuggestedTransform(Context, columnDestRenamed, columnDestRenamed);
+                        yield return ResNet18FeaturizingExtension.CreateSuggestedTransform(Context, columnDestRenamed, columnDestRenamed);
                     }
                 }
             }

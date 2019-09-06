@@ -18,7 +18,10 @@ namespace Microsoft.ML.AutoML
         OneHotEncoding,
         OneHotHashEncoding,
         TextFeaturizing,
-        ImageFeaturizing,
+        ImageLoading,
+        ImageResizing,
+        PixelExtracting,
+        ResNet18Featurizing,
         TypeConverting,
         ValueToKeyMapping
     }
@@ -37,7 +40,10 @@ namespace Microsoft.ML.AutoML
             { EstimatorName.OneHotEncoding, typeof(OneHotEncodingExtension) },
             { EstimatorName.OneHotHashEncoding, typeof(OneHotHashEncodingExtension) },
             { EstimatorName.TextFeaturizing, typeof(TextFeaturizingExtension) },
-            { EstimatorName.ImageFeaturizing, typeof(ImageFeaturizingExtension) },
+            { EstimatorName.ImageLoading, typeof(ImageLoadingExtension) },
+            { EstimatorName.ImageResizing, typeof(ImageResizingExtension) },
+            { EstimatorName.PixelExtracting, typeof(PixelExtractingExtension) },
+            { EstimatorName.ResNet18Featurizing, typeof(ResNet18FeaturizingExtension) },
             { EstimatorName.TypeConverting, typeof(TypeConvertingExtension) },
             { EstimatorName.ValueToKeyMapping, typeof(ValueToKeyMappingExtension) },
         };

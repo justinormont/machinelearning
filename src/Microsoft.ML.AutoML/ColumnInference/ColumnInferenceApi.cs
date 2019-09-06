@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Microsoft.ML.Data;
 
@@ -65,8 +66,7 @@ namespace Microsoft.ML.AutoML
 
             // Validate all columns specified in column info exist in inferred data view
             ColumnInferenceValidationUtil.ValidateSpecifiedColumnsExist(columnInfo, dataView);
-
-            var purposeInferenceResult = PurposeInference.InferPurposes(context, dataView, columnInfo);
+            var purposeInferenceResult = PurposeInference.InferPurposes(context, dataView, columnInfo, new DirectoryInfo(path).Parent.FullName);
 
             // start building result objects
             IEnumerable<TextLoader.Column> columnResults = null;

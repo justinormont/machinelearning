@@ -2,6 +2,10 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Collections;
+using System.Collections.Generic;
+using System.Dynamic;
+using System.IO;
 using Microsoft.ML.Data;
 using Microsoft.ML.Transforms;
 
@@ -223,7 +227,32 @@ namespace Microsoft.ML.AutoML
         }
     }
 
-    internal class ImageFeaturizingExtension : IEstimatorExtension
+    internal class ImageLoadingExtension : IEstimatorExtension
+    {
+        public static string ImageFolder { private get; set; }
+        public IEstimator<ITransformer> CreateInstance(MLContext context, PipelineNode pipelineNode)
+        {
+            return CreateInstance(context, pipelineNode.InColumns[0], pipelineNode.OutColumns[0]);
+        }
+
+        public static SuggestedTransform CreateSuggestedTransform(MLContext context, string inColumn, string outColumn)
+        {
+            var pipelineNodeProperty = new Dictionary<string, object>()
+            {
+                { "imageFolder", ImageFolder },
+            };
+            var pipelineNode = new PipelineNode(EstimatorName.ImageLoading.ToString(), PipelineNodeType.Transform, inColumn, outColumn, pipelineNodeProperty);
+            var estimator = CreateInstance(context, inColumn, outColumn);
+            return new SuggestedTransform(pipelineNode, estimator);
+        }
+
+        private static IEstimator<ITransformer> CreateInstance(MLContext context, string inColumn, string outColumn)
+        {
+            return context.Transforms.LoadImages(outColumn, ImageFolder, inColumn);
+        }
+    }
+
+    internal class ImageResizingExtension : IEstimatorExtension
     {
         public IEstimator<ITransformer> CreateInstance(MLContext context, PipelineNode pipelineNode)
         {
@@ -232,19 +261,60 @@ namespace Microsoft.ML.AutoML
 
         public static SuggestedTransform CreateSuggestedTransform(MLContext context, string inColumn, string outColumn)
         {
-            var pipelineNode = new PipelineNode(EstimatorName.ImageFeaturizing.ToString(),
-                PipelineNodeType.Transform, inColumn, outColumn);
+            var pipelineNodeProperty = new Dictionary<string, object>()
+            {
+                { "imageWidth", 224 },
+                { "imageHeight", 224 },
+            };
+            var pipelineNode = new PipelineNode(EstimatorName.ImageResizing.ToString(), PipelineNodeType.Transform, inColumn, outColumn, pipelineNodeProperty);
             var estimator = CreateInstance(context, inColumn, outColumn);
             return new SuggestedTransform(pipelineNode, estimator);
         }
 
-        private static IEstimator<ITransformer> CreateInstance(MLContext context, string inColumn, string outColumn)
+        public static IEstimator<ITransformer> CreateInstance(MLContext context, string inColumn, string outColumn)
         {
-            var estimator = context.Transforms.LoadImages(outputColumnName: outColumn, imageFolder: "/Users/justinormont/Documents/src/open-datasets/Datasets/DogBreedsVsFruits/Dataset", inputColumnName: inColumn)
-                .Append(context.Transforms.ResizeImages(outputColumnName: outColumn, imageWidth: 224, imageHeight: 224, inputColumnName: outColumn))
-                .Append(context.Transforms.ExtractPixels(outputColumnName: outColumn, interleavePixelColors: false, offsetImage: 0))
-                .Append(context.Transforms.DnnFeaturizeImage(outColumn, m => m.ModelSelector.ResNet18(context, m.OutputColumn, m.InputColumn), outColumn));
-            return estimator;
+            return context.Transforms.ResizeImages(outColumn, 224, 224, inColumn);
+        }
+    }
+
+    internal class PixelExtractingExtension : IEstimatorExtension
+    {
+        public IEstimator<ITransformer> CreateInstance(MLContext context, PipelineNode pipelineNode)
+        {
+            return CreateInstance(context, pipelineNode.OutColumns[0], pipelineNode.OutColumns[0]);
+        }
+
+        public static SuggestedTransform CreateSuggestedTransform(MLContext context, string inColumn, string outColumn)
+        {
+            var pipelineNode = new PipelineNode(EstimatorName.PixelExtracting.ToString(), PipelineNodeType.Transform, inColumn, outColumn);
+            var estimator = CreateInstance(context, inColumn, outColumn);
+            return new SuggestedTransform(pipelineNode, estimator);
+        }
+
+        public static IEstimator<ITransformer> CreateInstance(MLContext context, string inColumn, string outColumn)
+        {
+            return context.Transforms.ExtractPixels(outColumn, inColumn);
+        }
+    }
+
+    internal class ResNet18FeaturizingExtension : IEstimatorExtension
+    {
+        public IEstimator<ITransformer> CreateInstance(MLContext context, PipelineNode pipelineNode)
+        {
+            return CreateInstance(context, pipelineNode.InColumns[0], pipelineNode.OutColumns[0]);
+        }
+        public static SuggestedTransform CreateSuggestedTransform(MLContext context, string inColumn, string outColumn)
+        {
+            var pipelineNode = new PipelineNode(EstimatorName.ResNet18Featurizing.ToString(), PipelineNodeType.Transform, inColumn, outColumn);
+            var estimator = CreateInstance(context, inColumn, outColumn);
+            return new SuggestedTransform(pipelineNode, estimator);
+        }
+
+        public static IEstimator<ITransformer> CreateInstance(MLContext context, string inColumn, string outColumn)
+        {
+            string fullPath = new DirectoryInfo(System.Reflection.Assembly.GetAssembly(typeof(ResNet18FeaturizingExtension)).Location).Parent.FullName;
+            string modeDir = Path.Combine(fullPath, "DnnImageModels");
+            return context.Transforms.DnnFeaturizeImage(outColumn, m => m.ModelSelector.ResNet18(context, m.OutputColumn, m.InputColumn, modeDir), inColumn);
         }
     }
 
