@@ -9,8 +9,10 @@
     <ProjectReference Include="..\..\..\src\Microsoft.ML.AutoML\Microsoft.ML.AutoML.csproj" />
     <NativeAssemblyReference Include="MatrixFactorizationNative" />
     <NativeAssemblyReference Include="FastTreeNative" />
+    <NativeAssemblyReference Include="CpuMathNative" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.ML.DnnImageFeaturizer.ResNet18" Version="0.17.0-preview-28404-1" />
     <PackageReference Include="SciSharp.TensorFlow.Redist" Version="$(TensorFlowVersion)" />
   </ItemGroup>
 </Project>

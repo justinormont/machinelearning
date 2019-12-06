@@ -156,9 +156,6 @@ namespace Microsoft.ML.AutoML
 
             // For recommendation tasks, convert both user and item columns as key
             yield return new Experts.RecommendationColumns(context);
-
-            // For image columns, use image transforms.
-            yield return new Experts.Image(context);
         }
 
         internal static class Experts

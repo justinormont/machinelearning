@@ -66,17 +66,17 @@ namespace Microsoft.ML.AutoML
             {
                 trainers = GetBinaryLearners();
             }
-            else if (task == TaskKind.MulticlassClassification &&
-                columnInfo.ImagePathColumnNames.Count == 1 &&
-                columnInfo.CategoricalColumnNames.Count == 0 &&
-                columnInfo.NumericColumnNames.Count == 0 &&
-                columnInfo.TextColumnNames.Count == 0)
-            {
-                // Image Classification case where all you have is a label column and image column.
-                // This trainer takes features column of vector of bytes which will not work with any
-                // other trainer.
-                return new List<ITrainerExtension>() { new ImageClassificationExtension() };
-            }
+            //else if (task == TaskKind.MulticlassClassification &&
+            //    columnInfo.ImagePathColumnNames.Count == 1 &&
+            //    columnInfo.CategoricalColumnNames.Count == 0 &&
+            //    columnInfo.NumericColumnNames.Count == 0 &&
+            //    columnInfo.TextColumnNames.Count == 0)
+            //{
+            //    // Image Classification case where all you have is a label column and image column.
+            //    // This trainer takes features column of vector of bytes which will not work with any
+            //    // other trainer.
+            //    return new List<ITrainerExtension>() { new ImageClassificationExtension() };
+            //}
             else if (task == TaskKind.MulticlassClassification)
             {
                 trainers = GetMultiLearners();
