@@ -5,14 +5,13 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Microsoft.ML;
+using System.Linq;
+using System.Runtime.InteropServices;
 using Microsoft.ML.Data;
 using Microsoft.ML.Model;
 using Microsoft.ML.RunTests;
-using Microsoft.ML.StaticPipe;
 using Microsoft.ML.TestFramework.Attributes;
-using Microsoft.ML.Transforms.Onnx;
-using Microsoft.ML.Transforms.StaticPipe;
+using Microsoft.ML.TestFrameworkCommon.Attributes;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -89,28 +88,32 @@ namespace Microsoft.ML.Tests
         }
 
         [OnnxFact]
-        public void OnnxStatic()
+        public void OnnxFeaturizerWorkout()
         {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                return;
+            }
+
             var env = new MLContext(null);
             var imageHeight = 224;
             var imageWidth = 224;
             var dataFile = GetDataPath("images/images.tsv");
             var imageFolder = Path.GetDirectoryName(dataFile);
 
-            var data = TextLoaderStatic.CreateLoader(env, ctx => (
-                imagePath: ctx.LoadText(0),
-                name: ctx.LoadText(1)))
-                .Load(dataFile);
+            var data = ML.Data.LoadFromTextFile(dataFile, new[] {
+                new TextLoader.Column("imagePath", DataKind.String, 0),
+                new TextLoader.Column("name", DataKind.String, 1)
+            });
 
-            var pipe = data.MakeNewEstimator()
-                .Append(row => (
-                    row.name,
-                    data_0: row.imagePath.LoadAsImage(imageFolder).Resize(imageHeight, imageWidth).ExtractPixels(interleave: true)))
-                .Append(row => (row.name, output_1: row.data_0.DnnImageFeaturizer(m => m.ModelSelector.ResNet18(m.Environment, m.OutputColumn, m.InputColumn))));
+            var pipe = ML.Transforms.LoadImages("data_0", imageFolder, "imagePath")
+                .Append(ML.Transforms.ResizeImages("data_0", imageHeight, imageWidth))
+                .Append(ML.Transforms.ExtractPixels("data_0", interleavePixelColors: true))
+                .Append(ML.Transforms.DnnFeaturizeImage("output_1", m => m.ModelSelector.ResNet18(m.Environment, m.OutputColumn, m.InputColumn), "data_0"));
 
-            TestEstimatorCore(pipe.AsDynamic, data.AsDynamic);
+            TestEstimatorCore(pipe, data);
 
-            var result = pipe.Fit(data).Transform(data).AsDynamic;
+            var result = pipe.Fit(data).Transform(data);
             using (var cursor = result.GetRowCursor(result.Schema["output_1"]))
             {
                 var buffer = default(VBuffer<float>);
@@ -177,6 +180,67 @@ namespace Microsoft.ML.Tests
                     Assert.InRange(sum, 83.50, 84.50);
                 }
             }
+        }
+
+        internal sealed class ModelInput
+        {
+            [ColumnName("ImagePath"), LoadColumn(0)]
+            public string ImagePath { get; set; }
+
+            [ColumnName("Label"), LoadColumn(1)]
+            public string Label { get; set; }
+        }
+
+        internal sealed class ModelOutput
+        {
+            // ColumnName attribute is used to change the column name from
+            // its default value, which is the name of the field.
+            [ColumnName("PredictedLabel")]
+            public String Prediction { get; set; }
+            public float[] Score { get; set; }
+        }
+
+        [OnnxFact]
+        public void TestLoadFromDiskAndPredictionEngine()
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                return;
+            }
+
+            var dataFile = GetDataPath("images/images.tsv");
+            var imageFolder = Path.GetDirectoryName(dataFile);
+
+            var data = ML.Data.LoadFromTextFile<ModelInput>(
+                                path: dataFile,
+                                hasHeader: false,
+                                separatorChar: '\t',
+                                allowQuoting: true,
+                                allowSparse: false);
+
+           var dataProcessPipeline = ML.Transforms.Conversion.MapValueToKey("Label", "Label")
+                                     .Append(ML.Transforms.LoadImages("ImagePath_featurized", imageFolder, "ImagePath"))
+                                     .Append(ML.Transforms.ResizeImages("ImagePath_featurized", 224, 224, "ImagePath_featurized"))
+                                     .Append(ML.Transforms.ExtractPixels("ImagePath_featurized", "ImagePath_featurized"))
+                                     .Append(ML.Transforms.DnnFeaturizeImage("ImagePath_featurized", m => m.ModelSelector.ResNet18(m.Environment, m.OutputColumn, m.InputColumn), "ImagePath_featurized"))
+                                     .Append(ML.Transforms.Concatenate("Features", new[] { "ImagePath_featurized" }))
+                                     .Append(ML.Transforms.NormalizeMinMax("Features", "Features"))
+                                     .AppendCacheCheckpoint(ML);
+
+            var trainer = ML.MulticlassClassification.Trainers.OneVersusAll(ML.BinaryClassification.Trainers.AveragedPerceptron(labelColumnName: "Label", numberOfIterations: 10, featureColumnName: "Features"), labelColumnName: "Label")
+                                      .Append(ML.Transforms.Conversion.MapKeyToValue("PredictedLabel", "PredictedLabel"));
+
+            var trainingPipeline = dataProcessPipeline.Append(trainer);
+            var model = trainingPipeline.Fit(data);
+
+            string modelPath = GetOutputPath("TestSaveToDiskAndPredictionEngine-model.zip");
+            ML.Model.Save(model, data.Schema, modelPath);
+            var loadedModel = ML.Model.Load(modelPath, out var inputSchema);
+
+            var predEngine = ML.Model.CreatePredictionEngine<ModelInput, ModelOutput>(loadedModel);
+            ModelInput sample = ML.Data.CreateEnumerable<ModelInput>(data, false).First();
+            ModelOutput result = predEngine.Predict(sample);
+            Assert.Equal("tomato", result.Prediction);
         }
     }
 }

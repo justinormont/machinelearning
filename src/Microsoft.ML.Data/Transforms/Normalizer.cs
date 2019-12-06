@@ -9,6 +9,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.ML;
 using Microsoft.ML.Data;
+using Microsoft.ML.Internal.Utilities;
 using Microsoft.ML.Model.OnnxConverter;
 using Microsoft.ML.Model.Pfa;
 using Microsoft.ML.Runtime;
@@ -26,6 +27,52 @@ using Newtonsoft.Json.Linq;
 
 namespace Microsoft.ML.Transforms
 {
+    /// <summary>
+    /// <see cref="IEstimator{TTransformer}"/> for the <see cref="NormalizingTransformer"/>.
+    /// </summary>
+    /// <remarks>
+    /// <format type="text/markdown"><![CDATA[
+    ///
+    /// ###  Estimator Characteristics
+    /// |  |  |
+    /// | -- | -- |
+    /// | Does this estimator need to look at the data to train its parameters? | Yes |
+    /// | Input column data type | <xref:System.Single> or <xref:System.Double> or a known-sized vector of those types. |
+    /// | Output column data type | The same data type as the input column |
+    ///
+    /// The resulting NormalizingEstimator will normalize the data in one of the following ways based upon how it was created:
+    /// * Min Max - A linear rescale that is based upon the minimum and maximum values for each row.
+    /// * Mean Variance - Rescale each row to unit variance and, optionally, zero mean.
+    /// * Log Mean Variance - Rescale each row to unit variance, optionally, zero mean based on computations in log scale.
+    /// * Binning - Bucketizes the data in each row and performs a linear rescale based on the calculated bins.
+    /// * Supervised Binning - Bucketize the data in each row and performas a linear rescale based on the calculated bins. The bin calculation is based on correlation of the Label column.
+    ///
+    /// ### Estimator Details
+    /// The interval of the normalized data depends on whether fixZero is specified or not. fixZero defaults to true.
+    /// When fixZero is false, the normalized interval is $[0,1]$ and the distribution of the normalized values depends on the normalization mode. For example, with Min Max, the minimum
+    /// and maximum values are mapped to 0 and 1 respectively and remaining values fall in between.
+    /// When fixZero is set, the normalized interval is $[-1,1]$ with the distribution of the normalized values depending on the normalization mode, but the behavior is different.
+    /// With Min Max, the distribution depends on how far away the number is from 0, resulting in the number with the largest distance being mapped to 1 if its a positive number
+    /// or -1 if its a negative number. The distance from 0 will affect the distribution with a majority of numbers that are closer together normalizing towards 0.
+    ///
+    /// The equation for the output $y$ of applying both Mean Variance and Log Mean Variance on input $x$ without
+    /// using the CDF option is: $y = (x - \text{offset}) \text{scale}$. Where offset and scale are computed during training.
+    ///
+    /// Using the CDF option it is: $y = 0.5 * (1 + \text{ERF}((x - \text{mean}) / (\text{standard deviation} * sqrt(2)))$.
+    /// Where ERF is the [Error Function](https://en.wikipedia.org/wiki/Error_function) used to approximate the CDF of a random variable assumed to
+    /// normally distributed. The mean and standard deviation are computing during training.
+    ///
+    /// To create this estimator use one of the following:
+    /// * [NormalizeMinMax](xref:Microsoft.ML.NormalizationCatalog.NormalizeMinMax(Microsoft.ML.TransformsCatalog, System.String, System.String, System.Int64, System.Boolean))
+    /// * [NormalizeMeanVariance](xref:Microsoft.ML.NormalizationCatalog.NormalizeMeanVariance(Microsoft.ML.TransformsCatalog,System.String,System.String,System.Int64,System.Boolean,System.Boolean))
+    /// * [NormalizeLogMeanVariance](xref:Microsoft.ML.NormalizationCatalog.NormalizeLogMeanVariance(Microsoft.ML.TransformsCatalog,System.String,System.String,System.Int64,System.Boolean))
+    /// * [NormalizeBinning](xref:Microsoft.ML.NormalizationCatalog.NormalizeBinning(Microsoft.ML.TransformsCatalog,System.String,System.String,System.Int64,System.Boolean,System.Int32))
+    /// * [NormalizeSupervisedBinning](xref:Microsoft.ML.NormalizationCatalog.NormalizeSupervisedBinning(Microsoft.ML.TransformsCatalog,System.String,System.String,System.String,System.Int64,System.Boolean,System.Int32,System.Int32))
+    ///
+    /// Check the above links for usage examples.
+    /// ]]>
+    /// </format>
+    /// </remarks>
     public sealed class NormalizingEstimator : IEstimator<NormalizingTransformer>
     {
         [BestFriend]
@@ -144,13 +191,13 @@ namespace Microsoft.ML.Transforms
         }
 
         [BestFriend]
-        internal sealed class LogMeanVarianceColumnOptions : ColumnOptionsBase
+        internal sealed class LogMeanVarianceColumnOptions : ControlZeroColumnOptionsBase
         {
             public readonly bool UseCdf;
 
             public LogMeanVarianceColumnOptions(string outputColumnName, string inputColumnName = null,
-                long maximumExampleCount = Defaults.MaximumExampleCount, bool useCdf = Defaults.LogMeanVarCdf)
-                : base(outputColumnName, inputColumnName ?? outputColumnName, maximumExampleCount)
+                long maximumExampleCount = Defaults.MaximumExampleCount, bool useCdf = Defaults.LogMeanVarCdf, bool fixZero = Defaults.EnsureZeroUntouched)
+                : base(outputColumnName, inputColumnName ?? outputColumnName, maximumExampleCount, fixZero)
             {
                 UseCdf = useCdf;
             }
@@ -284,6 +331,9 @@ namespace Microsoft.ML.Transforms
         }
     }
 
+    /// <summary>
+    /// <see cref="ITransformer"/> resulting from fitting an <see cref="NormalizingEstimator"/>.
+    /// </summary>
     public sealed partial class NormalizingTransformer : OneToOneTransformerBase
     {
         internal const string LoaderSignature = "Normalizer";
@@ -308,7 +358,8 @@ namespace Microsoft.ML.Transforms
         {
             return new VersionInfo(
                 modelSignature: "NORMALZR",
-                verWrittenCur: 0x00010001, // Initial
+                // verWrittenCur: 0x00010001 // Initial
+                verWrittenCur: 0x00010002, // Support for multidimensional vectors
                 verReadableCur: 0x00010001,
                 verWeCanReadBack: 0x00010001,
                 loaderSignature: LoaderSignature,
@@ -336,20 +387,38 @@ namespace Microsoft.ML.Transforms
             internal static DataViewType LoadType(ModelLoadContext ctx)
             {
                 Contracts.AssertValue(ctx);
+
+                if (ctx.Header.ModelVerWritten < 0x00010002)
+                {
+                    // *** Previous Binary format ***
+                    //   - bool: is vector
+                    //   - int: vector size
+                    //   - byte: ItemKind of input column (only R4 and R8 are valid)
+                    bool isVectorOld = ctx.Reader.ReadBoolean();
+                    int vectorSize = ctx.Reader.ReadInt32();
+                    Contracts.CheckDecode(vectorSize >= 0);
+                    Contracts.CheckDecode(vectorSize > 0 || !isVectorOld);
+                    InternalDataKind itemKindOld = (InternalDataKind)ctx.Reader.ReadByte();
+                    Contracts.CheckDecode(itemKindOld == InternalDataKind.R4 || itemKindOld == InternalDataKind.R8);
+                    var itemTypeOld = ColumnTypeExtensions.PrimitiveTypeFromKind(itemKindOld);
+                    return isVectorOld ? (DataViewType)(new VectorDataViewType(itemTypeOld, vectorSize)) : itemTypeOld;
+                }
+
                 // *** Binary format ***
                 //   - bool: is vector
-                //   - int: vector size
                 //   - byte: ItemKind of input column (only R4 and R8 are valid)
-                bool isVector = ctx.Reader.ReadBoolean();
-                int vectorSize = ctx.Reader.ReadInt32();
-                Contracts.CheckDecode(vectorSize >= 0);
-                Contracts.CheckDecode(vectorSize > 0 || !isVector);
+                // If it is a vector:
+                //   - int: number of dimensions
+                //   - ints: as many as dimensions, each one represent the size of each dimension
 
+                bool isVector = ctx.Reader.ReadBoolean();
                 InternalDataKind itemKind = (InternalDataKind)ctx.Reader.ReadByte();
                 Contracts.CheckDecode(itemKind == InternalDataKind.R4 || itemKind == InternalDataKind.R8);
-
                 var itemType = ColumnTypeExtensions.PrimitiveTypeFromKind(itemKind);
-                return isVector ? (DataViewType)(new VectorDataViewType(itemType, vectorSize)) : itemType;
+
+                if (!isVector)
+                    return itemType;
+                return new VectorDataViewType(itemType, ctx.Reader.ReadIntArray());
             }
 
             internal static void SaveType(ModelSaveContext ctx, DataViewType type)
@@ -357,18 +426,22 @@ namespace Microsoft.ML.Transforms
                 Contracts.AssertValue(ctx);
                 // *** Binary format ***
                 //   - bool: is vector
-                //   - int: vector size
                 //   - byte: ItemKind of input column (only R4 and R8 are valid)
+                //   If it is a vector:
+                //   - int: number of dimensions of the vector
+                //   - ints: as many as dimensions, each one represents the size of each dimension
+
                 VectorDataViewType vectorType = type as VectorDataViewType;
                 ctx.Writer.Write(vectorType != null);
-
-                Contracts.Assert(vectorType == null || vectorType.IsKnownSize);
-                ctx.Writer.Write(vectorType?.Size ?? 0);
 
                 DataViewType itemType = vectorType?.ItemType ?? type;
                 itemType.RawType.TryGetDataKind(out InternalDataKind itemKind);
                 Contracts.Assert(itemKind == InternalDataKind.R4 || itemKind == InternalDataKind.R8);
                 ctx.Writer.Write((byte)itemKind);
+
+                Contracts.Assert(vectorType == null || vectorType.IsKnownSize);
+                if (vectorType != null)
+                    ctx.Writer.WriteIntArray(vectorType.Dimensions.ToArray());
             }
         }
 
@@ -733,7 +806,7 @@ namespace Microsoft.ML.Transforms
         }
 
         /// <summary>
-        /// Base class for all the NormalizerData classes: <see cref="AffineNormalizerModelParameters{TData}"/>,
+        /// Base class for all the data normalizer models like <see cref="AffineNormalizerModelParameters{TData}"/>,
         /// <see cref="BinNormalizerModelParameters{TData}"/>, <see cref="CdfNormalizerModelParameters{TData}"/>.
         /// </summary>
         public abstract class NormalizerModelParametersBase
@@ -747,7 +820,7 @@ namespace Microsoft.ML.Transforms
         /// <example>
         /// <format type="text/markdown">
         /// <![CDATA[
-        /// [!code-csharp[Normalize](~/../docs/samples/docs/samples/Microsoft.ML.Samples/Dynamic/Normalizer.cs)]
+        /// [!code-csharp[Normalize](~/../docs/samples/docs/samples/Microsoft.ML.Samples/Dynamic/Transforms/NormalizeLogMeanVariance.cs)]
         /// ]]>
         /// </format>
         /// </example>
@@ -783,7 +856,7 @@ namespace Microsoft.ML.Transforms
         /// <example>
         /// <format type="text/markdown">
         /// <![CDATA[
-        /// [!code-csharp[Normalize](~/../docs/samples/docs/samples/Microsoft.ML.Samples/Dynamic/Normalizer.cs)]
+        /// [!code-csharp[Normalize](~/../docs/samples/docs/samples/Microsoft.ML.Samples/Dynamic/Transforms/NormalizeLogMeanVariance.cs)]
         /// ]]>
         /// </format>
         /// </example>

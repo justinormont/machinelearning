@@ -20,7 +20,11 @@ namespace Microsoft.ML.CodeGenerator.Templates.Console
     /// Class to produce the template output
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "16.0.0.0")]
+<<<<<<< HEAD:src/Microsoft.ML.CodeGenerator/Templates/Console/ModelBuilder.cs
     public partial class ModelBuilder : ModelBuilderBase
+=======
+    internal partial class ModelBuilder : ModelBuilderBase
+>>>>>>> master:src/mlnet/Templates/Console/ModelBuilder.cs
     {
         /// <summary>
         /// Create the template output
@@ -119,6 +123,9 @@ if(!string.IsNullOrEmpty(TestPath)){
             this.Write("\r\n            // Set the training algorithm \r\n            var trainer = mlContext" +
                     ".");
             this.Write(this.ToStringHelper.ToStringWithCulture(TaskType));
+if("Recommendation".Equals(TaskType)){ 
+            this.Write("()");
+ } 
             this.Write(".Trainers.");
             this.Write(this.ToStringHelper.ToStringWithCulture(Trainer));
  for(int i=0;i<PostTrainerTransforms.Count;i++) 
@@ -168,9 +175,12 @@ if("BinaryClassification".Equals(TaskType)){
             this.Write(".Evaluate(predictions, \"");
             this.Write(this.ToStringHelper.ToStringWithCulture(LabelName));
             this.Write("\", \"Score\");\r\n            PrintMulticlassClassificationMetrics(metrics);\r\n");
-}if("Regression".Equals(TaskType)){ 
+}if("Regression".Equals(TaskType) || "Recommendation".Equals(TaskType)){ 
             this.Write("            var metrics = mlContext.");
             this.Write(this.ToStringHelper.ToStringWithCulture(TaskType));
+if("Recommendation".Equals(TaskType)){ 
+            this.Write("()");
+ } 
             this.Write(".Evaluate(predictions, \"");
             this.Write(this.ToStringHelper.ToStringWithCulture(LabelName));
             this.Write("\", \"Score\");\r\n            PrintRegressionMetrics(metrics);\r\n");
@@ -214,7 +224,8 @@ if("Regression".Equals(TaskType)){
 }
             this.Write("        }\r\n");
 }
-            this.Write(@"        private static void SaveModel(MLContext mlContext, ITransformer mlModel, string modelRelativePath, DataViewSchema modelInputSchema)
+            this.Write(@"
+        private static void SaveModel(MLContext mlContext, ITransformer mlModel, string modelRelativePath, DataViewSchema modelInputSchema)
         {
             // Save/persist the trained model to a .ZIP file
             Console.WriteLine($""=============== Saving the model  ==============="");
@@ -233,38 +244,42 @@ if("Regression".Equals(TaskType)){
         }
 
 ");
-if("Regression".Equals(TaskType)){ 
+if("Regression".Equals(TaskType) || "Recommendation".Equals(TaskType)){ 
             this.Write("        public static void PrintRegressionMetrics(RegressionMetrics metrics)\r\n   " +
                     "     {\r\n            Console.WriteLine($\"****************************************" +
-                    "*********\");\r\n            Console.WriteLine($\"*       Metrics for regression mod" +
-                    "el      \");\r\n            Console.WriteLine($\"*----------------------------------" +
-                    "--------------\");\r\n            Console.WriteLine($\"*       LossFn:        {metri" +
-                    "cs.LossFunction:0.##}\");\r\n            Console.WriteLine($\"*       R2 Score:     " +
-                    " {metrics.RSquared:0.##}\");\r\n            Console.WriteLine($\"*       Absolute lo" +
-                    "ss: {metrics.MeanAbsoluteError:#.##}\");\r\n            Console.WriteLine($\"*      " +
-                    " Squared loss:  {metrics.MeanSquaredError:#.##}\");\r\n            Console.WriteLin" +
-                    "e($\"*       RMS loss:      {metrics.RootMeanSquaredError:#.##}\");\r\n            C" +
-                    "onsole.WriteLine($\"*************************************************\");\r\n       " +
-                    " }\r\n\r\n        public static void PrintRegressionFoldsAverageMetrics(IEnumerable<" +
-                    "TrainCatalogBase.CrossValidationResult<RegressionMetrics>> crossValidationResult" +
-                    "s)\r\n        {\r\n            var L1 = crossValidationResults.Select(r => r.Metrics" +
-                    ".MeanAbsoluteError);\r\n            var L2 = crossValidationResults.Select(r => r." +
-                    "Metrics.MeanSquaredError);\r\n            var RMS = crossValidationResults.Select(" +
-                    "r => r.Metrics.RootMeanSquaredError);\r\n            var lossFunction = crossValid" +
-                    "ationResults.Select(r => r.Metrics.LossFunction);\r\n            var R2 = crossVal" +
-                    "idationResults.Select(r => r.Metrics.RSquared);\r\n\r\n            Console.WriteLine" +
-                    "($\"*****************************************************************************" +
-                    "********************************\");\r\n            Console.WriteLine($\"*       Met" +
-                    "rics for Regression model      \");\r\n            Console.WriteLine($\"*-----------" +
-                    "--------------------------------------------------------------------------------" +
-                    "-----------------\");\r\n            Console.WriteLine($\"*       Average L1 Loss:  " +
-                    "     {L1.Average():0.###} \");\r\n            Console.WriteLine($\"*       Average L" +
-                    "2 Loss:       {L2.Average():0.###}  \");\r\n            Console.WriteLine($\"*      " +
-                    " Average RMS:           {RMS.Average():0.###}  \");\r\n            Console.WriteLin" +
-                    "e($\"*       Average Loss Function: {lossFunction.Average():0.###}  \");\r\n        " +
-                    "    Console.WriteLine($\"*       Average R-squared:     {R2.Average():0.###}  \");" +
-                    "\r\n            Console.WriteLine($\"**********************************************" +
-                    "***************************************************************\");\r\n        }\r\n");
+                    "*********\");\r\n            Console.WriteLine($\"*       Metrics for ");
+            this.Write(this.ToStringHelper.ToStringWithCulture(TaskType));
+            this.Write(@" model      "");
+            Console.WriteLine($""*------------------------------------------------"");
+            Console.WriteLine($""*       LossFn:        {metrics.LossFunction:0.##}"");
+            Console.WriteLine($""*       R2 Score:      {metrics.RSquared:0.##}"");
+            Console.WriteLine($""*       Absolute loss: {metrics.MeanAbsoluteError:#.##}"");
+            Console.WriteLine($""*       Squared loss:  {metrics.MeanSquaredError:#.##}"");
+            Console.WriteLine($""*       RMS loss:      {metrics.RootMeanSquaredError:#.##}"");
+            Console.WriteLine($""*************************************************"");
+        }
+
+        public static void PrintRegressionFoldsAverageMetrics(IEnumerable<TrainCatalogBase.CrossValidationResult<RegressionMetrics>> crossValidationResults)
+        {
+            var L1 = crossValidationResults.Select(r => r.Metrics.MeanAbsoluteError);
+            var L2 = crossValidationResults.Select(r => r.Metrics.MeanSquaredError);
+            var RMS = crossValidationResults.Select(r => r.Metrics.RootMeanSquaredError);
+            var lossFunction = crossValidationResults.Select(r => r.Metrics.LossFunction);
+            var R2 = crossValidationResults.Select(r => r.Metrics.RSquared);
+
+            Console.WriteLine($""*************************************************************************************************************"");
+            Console.WriteLine($""*       Metrics for ");
+            this.Write(this.ToStringHelper.ToStringWithCulture(TaskType));
+            this.Write(@" model      "");
+            Console.WriteLine($""*------------------------------------------------------------------------------------------------------------"");
+            Console.WriteLine($""*       Average L1 Loss:       {L1.Average():0.###} "");
+            Console.WriteLine($""*       Average L2 Loss:       {L2.Average():0.###}  "");
+            Console.WriteLine($""*       Average RMS:           {RMS.Average():0.###}  "");
+            Console.WriteLine($""*       Average Loss Function: {lossFunction.Average():0.###}  "");
+            Console.WriteLine($""*       Average R-squared:     {R2.Average():0.###}  "");
+            Console.WriteLine($""*************************************************************************************************************"");
+        }
+");
  } if("BinaryClassification".Equals(TaskType)){ 
             this.Write("        public static void PrintBinaryClassificationMetrics(BinaryClassificationM" +
                     "etrics metrics)\r\n        {\r\n            Console.WriteLine($\"********************" +
@@ -384,14 +399,22 @@ public string Namespace {get;set;}
 public string LabelName {get;set;}
 public bool CacheBeforeTrainer {get;set;}
 public IList<string> PostTrainerTransforms {get;set;}
+<<<<<<< HEAD:src/Microsoft.ML.CodeGenerator/Templates/Console/ModelBuilder.cs
 public CSharp.GenerateTarget Target {get;set;}
+=======
+internal CSharp.GenerateTarget Target {get;set;}
+>>>>>>> master:src/mlnet/Templates/Console/ModelBuilder.cs
 
 
 void CLI_Annotation()
 {
 this.Write(@"//*****************************************************************************************
 //*                                                                                       *
+<<<<<<< HEAD:src/Microsoft.ML.CodeGenerator/Templates/Console/ModelBuilder.cs
 //* This file was auto-generated by ML.NET CLI (Command-Line Interface) tool.			  *
+=======
+//* This is an auto-generated file by Microsoft ML.NET CLI (Command-Line Interface) tool. *
+>>>>>>> master:src/mlnet/Templates/Console/ModelBuilder.cs
 //*                                                                                       *
 //*****************************************************************************************
 ");
@@ -413,7 +436,11 @@ this.Write("// This file was auto-generated by ML.NET Model Builder. \r\n");
     /// Base class for this transformation
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "16.0.0.0")]
+<<<<<<< HEAD:src/Microsoft.ML.CodeGenerator/Templates/Console/ModelBuilder.cs
     public class ModelBuilderBase
+=======
+    internal class ModelBuilderBase
+>>>>>>> master:src/mlnet/Templates/Console/ModelBuilder.cs
     {
         #region Fields
         private global::System.Text.StringBuilder generationEnvironmentField;

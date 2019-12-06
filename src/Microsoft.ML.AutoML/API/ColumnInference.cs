@@ -54,6 +54,16 @@ namespace Microsoft.ML.AutoML
         public string LabelColumnName { get; set; }
 
         /// <summary>
+        /// The dataset column to use as a user ID for computation.
+        /// </summary>
+        public string UserIdColumnName { get; set; }
+
+        /// <summary>
+        /// The dataset column to use as a item ID for computation.
+        /// </summary>
+        public string ItemIdColumnName { get; set; }
+
+        /// <summary>
         /// The dataset column to use for example weight.
         /// </summary>
         public string ExampleWeightColumnName { get; set; }
@@ -100,6 +110,12 @@ namespace Microsoft.ML.AutoML
         /// <value>The default value is a new, empty <see cref="Collection{String}"/>.</value>
         public ICollection<string> IgnoredColumnNames { get; }
 
+        /// <summary>
+        /// The dataset columns that are image paths.
+        /// </summary>
+        /// <value>The default value is a new, empty <see cref="Collection{String}"/>.</value>
+        public ICollection<string> ImagePathColumnNames { get; }
+
         public ColumnInformation()
         {
             LabelColumnName = DefaultColumnNames.Label;
@@ -108,6 +124,7 @@ namespace Microsoft.ML.AutoML
             TextColumnNames = new Collection<string>();
             ImagePathColumnNames = new Collection<string>();
             IgnoredColumnNames = new Collection<string>();
+            ImagePathColumnNames = new Collection<string>();
         }
     }
 }

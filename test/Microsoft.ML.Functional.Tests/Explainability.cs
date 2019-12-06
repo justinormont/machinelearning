@@ -4,8 +4,8 @@
 
 using Microsoft.ML.Data;
 using Microsoft.ML.Functional.Tests.Datasets;
-using Microsoft.ML.RunTests;
-using Microsoft.ML.TestFramework;
+using Microsoft.ML.TestFrameworkCommon;
+using Microsoft.ML.Trainers;
 using Microsoft.ML.Trainers.FastTree;
 using Xunit;
 using Xunit.Abstractions;
@@ -15,7 +15,7 @@ namespace Microsoft.ML.Functional.Tests
     /// <summary>
     /// Test explainability features.
     /// </summary>
-    public class Explainability : BaseTestClass
+    public class Explainability : FunctionalTestBaseClass
     {
         public Explainability(ITestOutputHelper output) : base(output)
         {
@@ -24,24 +24,52 @@ namespace Microsoft.ML.Functional.Tests
         /// <summary>
         /// GlobalFeatureImportance: PFI can be used to compute global feature importance.
         /// </summary>
-        [Fact]
-        public void GlobalFeatureImportanceWithPermutationFeatureImportance()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void GlobalFeatureImportanceWithPermutationFeatureImportance(bool saveModel)
         {
             var mlContext = new MLContext(seed: 1);
 
             // Get the dataset
-            var data = mlContext.Data.LoadFromTextFile<HousingRegression>(GetDataPath(TestDatasets.housing.trainFilename), hasHeader: true);
+            var data = mlContext.Data.LoadFromTextFile<HousingRegression>(TestCommon.GetDataPath(DataDir, TestDatasets.housing.trainFilename), hasHeader: true);
 
             // Create a pipeline to train on the housing data.
             var pipeline = mlContext.Transforms.Concatenate("Features", HousingRegression.Features)
                 .Append(mlContext.Regression.Trainers.Sdca());
 
-            // Fit the pipeline and transform the data.
+            // Fit the pipeline
             var model = pipeline.Fit(data);
-            var transformedData = model.Transform(data);
+
+            IDataView transformedData;
+            RegressionPredictionTransformer<LinearRegressionModelParameters> linearPredictor;
+
+            if(saveModel)
+            {
+                ITransformer loadedModel;
+
+                // Load and save the model
+                var modelAndSchemaPath = TestCommon.GetOutputPath(OutDir, "TestFunctionalTestPFI.zip");
+                mlContext.Model.Save(model, data.Schema, modelAndSchemaPath);
+                loadedModel = mlContext.Model.Load(modelAndSchemaPath, out var schema);
+
+                // Transform the data
+                transformedData = loadedModel.Transform(data);
+
+                // Extract linear predictor
+                linearPredictor = (loadedModel as TransformerChain<ITransformer>).LastTransformer as RegressionPredictionTransformer<LinearRegressionModelParameters>;
+            }
+            else
+            {
+                // Transform the data
+                transformedData = model.Transform(data);
+
+                // Extract linear predictor
+                linearPredictor = model.LastTransformer;
+            }
 
             // Compute the permutation feature importance to look at global feature importance.
-            var permutationMetrics = mlContext.Regression.PermutationFeatureImportance(model.LastTransformer, transformedData);
+            var permutationMetrics = mlContext.Regression.PermutationFeatureImportance(linearPredictor, transformedData);
 
             // Make sure the correct number of features came back.
             Assert.Equal(HousingRegression.Features.Length, permutationMetrics.Length);
@@ -62,7 +90,7 @@ namespace Microsoft.ML.Functional.Tests
             var mlContext = new MLContext(seed: 1);
 
             // Get the dataset.
-            var data = mlContext.Data.LoadFromTextFile<HousingRegression>(GetDataPath(TestDatasets.housing.trainFilename), hasHeader: true);
+            var data = mlContext.Data.LoadFromTextFile<HousingRegression>(TestCommon.GetDataPath(DataDir, TestDatasets.housing.trainFilename), hasHeader: true);
 
             // Create a pipeline to train on the housing data.
             var pipeline = mlContext.Transforms.Concatenate("Features", HousingRegression.Features)
@@ -86,7 +114,7 @@ namespace Microsoft.ML.Functional.Tests
             var mlContext = new MLContext(seed: 1);
 
             // Get the dataset
-            var data = mlContext.Data.LoadFromTextFile<HousingRegression>(GetDataPath(TestDatasets.housing.trainFilename), hasHeader: true);
+            var data = mlContext.Data.LoadFromTextFile<HousingRegression>(TestCommon.GetDataPath(DataDir, TestDatasets.housing.trainFilename), hasHeader: true);
 
             // Create a pipeline to train on the housing data.
             var pipeline = mlContext.Transforms.Concatenate("Features", HousingRegression.Features)
@@ -113,7 +141,7 @@ namespace Microsoft.ML.Functional.Tests
             var mlContext = new MLContext(seed: 1);
 
             // Get the dataset
-            var data = mlContext.Data.LoadFromTextFile<HousingRegression>(GetDataPath(TestDatasets.housing.trainFilename), hasHeader: true);
+            var data = mlContext.Data.LoadFromTextFile<HousingRegression>(TestCommon.GetDataPath(DataDir, TestDatasets.housing.trainFilename), hasHeader: true);
 
             // Create a pipeline to train on the housing data.
             var pipeline = mlContext.Transforms.Concatenate("Features", HousingRegression.Features)
@@ -140,7 +168,7 @@ namespace Microsoft.ML.Functional.Tests
             var mlContext = new MLContext(seed: 1);
 
             // Get the dataset
-            var data = mlContext.Data.LoadFromTextFile<HousingRegression>(GetDataPath(TestDatasets.housing.trainFilename), hasHeader: true);
+            var data = mlContext.Data.LoadFromTextFile<HousingRegression>(TestCommon.GetDataPath(DataDir, TestDatasets.housing.trainFilename), hasHeader: true);
 
             // Create a pipeline to train on the housing data.
             var pipeline = mlContext.Transforms.Concatenate("Features", HousingRegression.Features)
@@ -177,7 +205,7 @@ namespace Microsoft.ML.Functional.Tests
             var mlContext = new MLContext(seed: 1);
 
             // Get the dataset
-            var data = mlContext.Data.LoadFromTextFile<HousingRegression>(GetDataPath(TestDatasets.housing.trainFilename), hasHeader: true);
+            var data = mlContext.Data.LoadFromTextFile<HousingRegression>(TestCommon.GetDataPath(DataDir, TestDatasets.housing.trainFilename), hasHeader: true);
 
             // Create a pipeline to train on the housing data.
             var pipeline = mlContext.Transforms.Concatenate("Features", HousingRegression.Features)
@@ -214,7 +242,7 @@ namespace Microsoft.ML.Functional.Tests
             var mlContext = new MLContext(seed: 1);
 
             // Get the dataset
-            var data = mlContext.Data.LoadFromTextFile<HousingRegression>(GetDataPath(TestDatasets.housing.trainFilename), hasHeader: true);
+            var data = mlContext.Data.LoadFromTextFile<HousingRegression>(TestCommon.GetDataPath(DataDir, TestDatasets.housing.trainFilename), hasHeader: true);
 
             // Create a pipeline to train on the housing data.
             var pipeline = mlContext.Transforms.Concatenate("Features", HousingRegression.Features)
@@ -252,7 +280,7 @@ namespace Microsoft.ML.Functional.Tests
             var mlContext = new MLContext(seed: 1);
 
             // Get the dataset
-            var data = mlContext.Data.LoadFromTextFile<HousingRegression>(GetDataPath(TestDatasets.housing.trainFilename), hasHeader: true);
+            var data = mlContext.Data.LoadFromTextFile<HousingRegression>(TestCommon.GetDataPath(DataDir, TestDatasets.housing.trainFilename), hasHeader: true);
 
             // Create a pipeline to train on the housing data.
             var pipeline = mlContext.Transforms.Concatenate("Features", HousingRegression.Features)

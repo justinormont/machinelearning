@@ -22,7 +22,7 @@ namespace Microsoft.ML.Trainers
     /// <example>
     /// <format type="text/markdown">
     /// <![CDATA[
-    ///  [!code-csharp[KMeans](~/../docs/samples/docs/samples/Microsoft.ML.Samples/Dynamic/KMeans.cs)]
+    ///  [!code-csharp[KMeans](~/../docs/samples/docs/samples/Microsoft.ML.Samples/Dynamic/Trainers/Clustering/KMeans.cs)]
     /// ]]></format>
     /// </example>
     public sealed class KMeansModelParameters :
@@ -351,10 +351,16 @@ namespace Microsoft.ML.Trainers
             var addNodeY = ctx.CreateNode("Add", new[] { nameZ, nameC2 }, new[] { nameY }, ctx.GetNodeName("Add"), "");
 
             // Compute the most-matched cluster index, L
-            var nameL = outputNames[0];
+            var nameL = "ArgMinInt64";
             var predictNodeL = ctx.CreateNode("ArgMin", nameY, nameL, ctx.GetNodeName("ArgMin"), "");
             predictNodeL.AddAttribute("axis", 1);
             predictNodeL.AddAttribute("keepdims", 1);
+
+            // ArgMin outputs an Int64. But ML.NET's KMeans trainer outputs a UINT32.
+            // Cast the output here to UInt32 to make them compatible
+            var predictedNode = ctx.CreateNode("Cast", nameL, outputNames[0], ctx.GetNodeName("Cast"), "");
+            var t = InternalDataKindExtensions.ToInternalDataKind(DataKind.UInt32).ToType();
+            predictedNode.AddAttribute("to", t);
 
             return true;
         }

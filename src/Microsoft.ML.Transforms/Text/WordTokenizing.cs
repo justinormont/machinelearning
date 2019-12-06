@@ -11,6 +11,7 @@ using Microsoft.ML.CommandLine;
 using Microsoft.ML.Data;
 using Microsoft.ML.Internal.Internallearn;
 using Microsoft.ML.Internal.Utilities;
+using Microsoft.ML.Model.OnnxConverter;
 using Microsoft.ML.Model.Pfa;
 using Microsoft.ML.Runtime;
 using Microsoft.ML.Transforms.Text;
@@ -31,10 +32,9 @@ using Newtonsoft.Json.Linq;
 namespace Microsoft.ML.Transforms.Text
 {
 
-    // The input for this transform is a ReadOnlyMemory or a vector of ReadOnlyMemory, and its output is a vector of ReadOnlyMemory<char>,
-    // corresponding to the tokens in the input text, split using a set of user specified separator characters.
-    // Empty strings and strings containing only spaces are dropped.
-    /// <include file='doc.xml' path='doc/members/member[@name="WordTokenizer"]/*' />
+    /// <summary>
+    /// <see cref="ITransformer"/> resulting from fitting an <see cref="WordTokenizingEstimator"/>.
+    /// </summary>
     public sealed class WordTokenizingTransformer : OneToOneTransformerBase
     {
         internal class Column : OneToOneColumn
@@ -197,7 +197,7 @@ namespace Microsoft.ML.Transforms.Text
 
         private protected override IRowMapper MakeRowMapper(DataViewSchema schema) => new Mapper(this, schema);
 
-        private sealed class Mapper : OneToOneMapperBase, ISaveAsPfa
+        private sealed class Mapper : OneToOneMapperBase, ISaveAsOnnx, ISaveAsPfa
         {
             private readonly DataViewType _type;
             private readonly WordTokenizingTransformer _parent;
@@ -392,14 +392,62 @@ namespace Microsoft.ML.Transforms.Text
                 srcToken = PfaUtils.Call("a.filter", srcToken, hasCharsRef);
                 return srcToken;
             }
+
+            public bool CanSaveOnnx(OnnxContext ctx) => true;
+
+            private const string DefaultPadValue = "#"; // TODO: This is not supported in the API. What should be this value?
+            public void SaveAsOnnx(OnnxContext ctx)
+            {
+                var columns = _parent.Columns.GetEnumerator();
+                columns.Reset();
+
+                string opType;
+                while (columns.MoveNext())
+                {
+                    opType = "Tokenizer";
+                    var column = columns.Current;
+                    var intermediateVar = ctx.AddIntermediateVariable(_type, "TokenizerOutput", true);
+                    var tokenizerNode = ctx.CreateNode(opType, ctx.GetVariableName(column.InputColumnName),
+                                                intermediateVar, ctx.GetNodeName(opType), "com.microsoft");
+                    tokenizerNode.AddAttribute("mark", 0);
+                    tokenizerNode.AddAttribute("mincharnum", 1);
+                    tokenizerNode.AddAttribute("pad_value", DefaultPadValue);
+                    string[] separators = column.SeparatorsArray.Select(c => c.ToString()).ToArray();
+                    tokenizerNode.AddAttribute("separators", separators);
+
+                    opType = "Squeeze";
+                    var squeezeOutput = ctx.AddIntermediateVariable(_type, column.Name, true);
+                    var squeezeNode = ctx.CreateNode(opType, intermediateVar, squeezeOutput, ctx.GetNodeName(opType), "");
+                    squeezeNode.AddAttribute("axes", new long[] { 0 });
+                }
+            }
         }
 
     }
 
     /// <summary>
-    /// Word tokenizer splits text into tokens using the delimiter.
-    /// For each text input, the output column is a variable vector of text.
+    /// Tokenizes input text using specified delimiters.
     /// </summary>
+    /// <remarks>
+    /// <format type="text/markdown"><![CDATA[
+    ///
+    /// ###  Estimator Characteristics
+    /// |  |  |
+    /// | -- | -- |
+    /// | Does this estimator need to look at the data to train its parameters? | No |
+    /// | Input column data type | Scalar or Vector of [Text](xref:Microsoft.ML.Data.TextDataViewType)  |
+    /// | Output column data type | Variable-size vector of [Text](xref:Microsoft.ML.Data.TextDataViewType) |
+    ///
+    /// The resulting <xref:Microsoft.ML.Transforms.Text.WordTokenizingTransformer> creates a new column,
+    /// named as specified in the output column name parameters, where each input string is mapped to a vector of substrings obtained
+    /// by splitting the input string according to the user defined delimiters. The space character is the default delimiter.
+    ///
+    /// Empty strings and strings containing only spaces are dropped.
+    ///
+    /// Check the See Also section for links to usage examples.
+    /// ]]></format>
+    /// </remarks>
+    /// <seealso cref="TextCatalog.TokenizeIntoWords(TransformsCatalog.TextTransforms, string, string, char[])"/>
     public sealed class WordTokenizingEstimator : TrivialEstimator<WordTokenizingTransformer>
     {
         internal static bool IsColumnTypeValid(DataViewType type) => type.GetItemType() is TextDataViewType;
@@ -410,8 +458,10 @@ namespace Microsoft.ML.Transforms.Text
         /// Tokenize incoming text in <paramref name="inputColumnName"/> and output the tokens as <paramref name="outputColumnName"/>.
         /// </summary>
         /// <param name="env">The environment.</param>
-        /// <param name="outputColumnName">Name of the column resulting from the transformation of <paramref name="inputColumnName"/>.</param>
-        /// <param name="inputColumnName">Name of the column to transform. If set to <see langword="null"/>, the value of the <paramref name="outputColumnName"/> will be used as source.</param>
+        /// <param name="outputColumnName">Name of the column resulting from the transformation of <paramref name="inputColumnName"/>.
+        /// The output column is of type variable vector of string.</param>
+        /// <param name="inputColumnName">Name of the column to transform. If set to <see langword="null"/>, the value of the <paramref name="outputColumnName"/> will be used as source.
+        /// This column should be of type string.</param>
         /// <param name="separators">The separators to use (uses space character by default).</param>
         internal WordTokenizingEstimator(IHostEnvironment env, string outputColumnName, string inputColumnName = null, char[] separators = null)
             : this(env, new[] { (outputColumnName, inputColumnName ?? outputColumnName) }, separators)

@@ -9,6 +9,7 @@ using Microsoft.ML.CommandLine;
 using Microsoft.ML.Data;
 using Microsoft.ML.Internal.Utilities;
 using Microsoft.ML.Runtime;
+using Microsoft.ML.TestFrameworkCommon;
 using Microsoft.ML.Transforms;
 using Microsoft.ML.Transforms.Text;
 using Xunit;
@@ -231,7 +232,7 @@ namespace Microsoft.ML.RunTests
                             {
                                 getters[i](ref v1);
                                 getters[i + 1](ref v2);
-                                Check(CompareVec(in v1, in v2, v1.Length, fn), "Mismatch");
+                                Check(TestCommon.CompareVec(in v1, in v2, v1.Length, fn), "Mismatch");
                             }
                         }
                     }
@@ -567,8 +568,8 @@ namespace Microsoft.ML.RunTests
                 },
                 (pipe) =>
                 {
-                    // Column F13 contains the ngram counts of column Two, and column F23 contains the ngram counts
-                    // of columns Two and One. Therefore, make sure that the ngrams in column Two were hashed to the same 
+                    // Column F13 contains the n-gram counts of column Two, and column F23 contains the n-gram counts
+                    // of columns Two and One. Therefore, make sure that the n-grams in column Two were hashed to the same 
                     // slots in F13 as they were in column F23. We do this by checking that for every slot, F23 is >= F13.
                     using (var c = pipe.GetRowCursorForAllColumns())
                     {
@@ -587,7 +588,7 @@ namespace Microsoft.ML.RunTests
                         {
                             get1(ref bag1);
                             get2(ref bag2);
-                            if (!CompareVec(in bag1, in bag2, bag1.Length, (x1, x2) => x1 <= x2))
+                            if (!TestCommon.CompareVec(in bag1, in bag2, bag1.Length, (x1, x2) => x1 <= x2))
                             {
                                 Fail("Values don't match in columns F13, F23");
                                 return;
@@ -629,7 +630,7 @@ namespace Microsoft.ML.RunTests
                         {
                             get1(ref bag1);
                             get2(ref bag2);
-                            if (!CompareVec(in bag1, in bag2, bag1.Length, (x1, x2) => 2 * x1 == x2))
+                            if (!TestCommon.CompareVec(in bag1, in bag2, bag1.Length, (x1, x2) => 2 * x1 == x2))
                             {
                                 Fail("Values don't match");
                                 return;
@@ -781,7 +782,7 @@ namespace Microsoft.ML.RunTests
                         {
                             get1(ref b1);
                             get2(ref b2);
-                            if (!CompareVec(in b1, in b2, b1.Length, (x1, x2) => 2 * x1 == x2))
+                            if (!TestCommon.CompareVec(in b1, in b2, b1.Length, (x1, x2) => 2 * x1 == x2))
                             {
                                 Fail("Unexpected values in row {0}", c.Position);
                                 break;
@@ -924,7 +925,7 @@ namespace Microsoft.ML.RunTests
                         while (c.MoveNext())
                         {
                             getter(ref buffer);
-                            CompareVec(in buffer, in expected[index++], buffer.GetValues().Length, (s1, s2) => s1.Span.SequenceEqual(s2.Span));
+                            TestCommon.CompareVec(in buffer, in expected[index++], buffer.GetValues().Length, (s1, s2) => s1.Span.SequenceEqual(s2.Span));
                         }
                     }
                 };

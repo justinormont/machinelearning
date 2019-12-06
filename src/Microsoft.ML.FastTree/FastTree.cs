@@ -14,6 +14,7 @@ using Microsoft.ML.Calibrators;
 using Microsoft.ML.CommandLine;
 using Microsoft.ML.Data;
 using Microsoft.ML.Data.Conversion;
+using Microsoft.ML.FastTree.Utils;
 using Microsoft.ML.Internal.Internallearn;
 using Microsoft.ML.Internal.Utilities;
 using Microsoft.ML.Model;
@@ -2791,7 +2792,6 @@ namespace Microsoft.ML.Trainers.FastTree
         IPredictorWithFeatureWeights<float>,
         IFeatureContributionMapper,
         ICalculateFeatureContribution,
-        ICanGetSummaryAsIRow,
         ISingleCanSavePfa,
         ISingleCanSaveOnnx
     {
@@ -3229,10 +3229,10 @@ namespace Microsoft.ML.Trainers.FastTree
         }
 
         /// <summary>
-        /// Copy the weights of all training features to <paramref name="weights"/>.
+        /// Get the cumulative split gains for each feature across all trees.
         /// </summary>
-        /// <param name="weights">a <see cref="VBuffer{T}"/> where feature weights would be assigned to.
-        /// The i-th element in <paramref name="weights"/> stores the weight of the i-th feature.</param>
+        /// <param name="weights">A <see cref="VBuffer{T}"/> to hold the cumulative split gain value for each feature.
+        /// The i-th element in <paramref name="weights"/> stores the cumulative split gain of the i-th feature.</param>
         public void GetFeatureWeights(ref VBuffer<float> weights)
         {
             var numFeatures = Math.Max(NumFeatures, MaxSplitFeatIdx + 1);
@@ -3275,23 +3275,6 @@ namespace Microsoft.ML.Trainers.FastTree
         {
             return TrainedEnsemble.GetTreeAt(treeId).GetLeaf(in features, ref path);
         }
-
-        DataViewRow ICanGetSummaryAsIRow.GetSummaryIRowOrNull(RoleMappedSchema schema)
-        {
-            var names = default(VBuffer<ReadOnlyMemory<char>>);
-            AnnotationUtils.GetSlotNames(schema, RoleMappedSchema.ColumnRole.Feature, NumFeatures, ref names);
-            var metaBuilder = new DataViewSchema.Annotations.Builder();
-            metaBuilder.AddSlotNames(NumFeatures, names.CopyTo);
-
-            var weights = default(VBuffer<Single>);
-            ((IHaveFeatureWeights)this).GetFeatureWeights(ref weights);
-            var builder = new DataViewSchema.Annotations.Builder();
-            builder.Add<VBuffer<float>>("Gains", new VectorDataViewType(NumberDataViewType.Single, NumFeatures), weights.CopyTo, metaBuilder.ToAnnotations());
-
-            return AnnotationUtils.AnnotationsAsRow(builder.ToAnnotations());
-        }
-
-        DataViewRow ICanGetSummaryAsIRow.GetStatsIRowOrNull(RoleMappedSchema schema) => null;
 
         private sealed class Tree : ITree<VBuffer<float>>
         {
@@ -3378,7 +3361,7 @@ namespace Microsoft.ML.Trainers.FastTree
     /// and <see cref="TreeEnsembleModelParametersBasedOnRegressionTree"/> is the type of
     /// <see cref="TrainedTreeEnsemble"/>.
     /// </summary>
-    public abstract class TreeEnsembleModelParametersBasedOnRegressionTree : TreeEnsembleModelParameters
+    public abstract class TreeEnsembleModelParametersBasedOnRegressionTree : TreeEnsembleModelParameters, ICanGetSummaryAsIDataView
     {
         /// <summary>
         /// An ensemble of trees exposed to users. It is a wrapper on the <see langword="internal"/>
@@ -3406,6 +3389,12 @@ namespace Microsoft.ML.Trainers.FastTree
             var treeWeights = TrainedEnsemble.Trees.Select(tree => tree.Weight);
             return new RegressionTreeEnsemble(trees, treeWeights, TrainedEnsemble.Bias);
         }
+
+        /// <summary>
+        /// Used for the Summarize entrypoint.
+        /// </summary>
+        IDataView ICanGetSummaryAsIDataView.GetSummaryDataView(RoleMappedSchema schema)
+        => RegressionTreeBaseUtils.RegressionTreeEnsembleAsIDataView(Host, TrainedTreeEnsemble.Bias, TrainedTreeEnsemble.TreeWeights, TrainedTreeEnsemble.Trees);
     }
 
     /// <summary>
@@ -3418,7 +3407,7 @@ namespace Microsoft.ML.Trainers.FastTree
     /// and <see cref="TreeEnsembleModelParametersBasedOnRegressionTree"/> is the type of
     /// <see cref="TrainedTreeEnsemble"/>.
     /// </summary>
-    public abstract class TreeEnsembleModelParametersBasedOnQuantileRegressionTree : TreeEnsembleModelParameters
+    public abstract class TreeEnsembleModelParametersBasedOnQuantileRegressionTree : TreeEnsembleModelParameters, ICanGetSummaryAsIDataView
     {
         /// <summary>
         /// An ensemble of trees exposed to users. It is a wrapper on the <see langword="internal"/>
@@ -3446,5 +3435,11 @@ namespace Microsoft.ML.Trainers.FastTree
             var treeWeights = TrainedEnsemble.Trees.Select(tree => tree.Weight);
             return new QuantileRegressionTreeEnsemble(trees, treeWeights, TrainedEnsemble.Bias);
         }
+
+        /// <summary>
+        /// Used for the Summarize entrypoint.
+        /// </summary>
+        IDataView ICanGetSummaryAsIDataView.GetSummaryDataView(RoleMappedSchema schema)
+            => RegressionTreeBaseUtils.RegressionTreeEnsembleAsIDataView(Host, TrainedTreeEnsemble.Bias, TrainedTreeEnsemble.TreeWeights, TrainedTreeEnsemble.Trees);
     }
 }

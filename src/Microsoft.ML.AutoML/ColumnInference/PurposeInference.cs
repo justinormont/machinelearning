@@ -283,14 +283,6 @@ namespace Microsoft.ML.AutoML
             ColumnInformation columnInfo, string imageFolder = null)
         {
             data = context.Data.TakeRows(data, MaxRowsToRead);
-
-            // sorry
-            if (imageFolder != null)
-            {
-                Experts.TextClassification.ImageFolder = imageFolder;
-                ImageLoadingExtension.ImageFolder = imageFolder;
-            }
-
             var allColumns = new List<IntermediateColumn>();
             var columnsToInfer = new List<IntermediateColumn>();
 

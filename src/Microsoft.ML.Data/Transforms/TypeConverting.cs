@@ -51,8 +51,7 @@ namespace Microsoft.ML.Transforms
     }
 
     /// <summary>
-    /// <see cref="TypeConvertingTransformer"/> converts underlying column types.
-    /// The source and destination column types need to be compatible.
+    /// <see cref="ITransformer"/> resulting from fitting a <see cref="TypeConvertingEstimator"/>.
     /// </summary>
     public sealed class TypeConvertingTransformer : OneToOneTransformerBase
     {
@@ -382,13 +381,13 @@ namespace Microsoft.ML.Transforms
             return true;
         }
 
-        private sealed class Mapper : OneToOneMapperBase, ICanSaveOnnx
+        private sealed class Mapper : OneToOneMapperBase, ISaveAsOnnx
         {
             private readonly TypeConvertingTransformer _parent;
             private readonly DataViewType[] _types;
             private readonly int[] _srcCols;
 
-            public bool CanSaveOnnx(OnnxContext ctx) => ctx.GetOnnxVersion() == OnnxVersion.Experimental;
+            public bool CanSaveOnnx(OnnxContext ctx) => true;
 
             public Mapper(TypeConvertingTransformer parent, DataViewSchema inputSchema)
                 : base(parent.Host.Register(nameof(Mapper)), parent, inputSchema)
@@ -498,24 +497,35 @@ namespace Microsoft.ML.Transforms
 
             private bool SaveAsOnnxCore(OnnxContext ctx, int iinfo, string srcVariableName, string dstVariableName)
             {
-                var opType = "CSharp";
-                var node = ctx.CreateNode(opType, srcVariableName, dstVariableName, ctx.GetNodeName(opType));
-                node.AddAttribute("type", LoaderSignature);
-                node.AddAttribute("to", (byte)_parent._columns[iinfo].OutputKind);
-                if (_parent._columns[iinfo].OutputKeyCount != null)
-                {
-                    var key = (KeyDataViewType)_types[iinfo].GetItemType();
-                    node.AddAttribute("max", key.Count);
-                }
+                var opType = "Cast";
+                var node = ctx.CreateNode(opType, srcVariableName, dstVariableName, ctx.GetNodeName(opType), "");
+                var t = _parent._columns[iinfo].OutputKind.ToInternalDataKind().ToType();
+                node.AddAttribute("to", t);
                 return true;
             }
         }
     }
 
     /// <summary>
-    /// <see cref="TypeConvertingEstimator"/> converts underlying column types.
-    /// The source and destination column types need to be compatible.
+    /// Estimator for <see cref="TypeConvertingTransformer"/>. Converts the underlying input column type to a new type.
+    /// The input and output column types need to be compatible.
+    /// <see cref="PrimitiveDataViewType"/>
     /// </summary>
+    /// <remarks>
+    /// <format type="text/markdown"><![CDATA[
+    ///
+    /// ###  Estimator Characteristics
+    /// |  |  |
+    /// | -- | -- |
+    /// | Does this estimator need to look at the data to train its parameters? | No |
+    /// | Input column data type | Vector or primitive numeric, boolean, [text](xref:Microsoft.ML.Data.TextDataViewType), [System.DateTime](xref:System.DateTime) and [key](xref:Microsoft.ML.Data.KeyDataViewType) type. |
+    /// | Output column data type | Vector or primitive numeric, boolean, [text](xref:Microsoft.ML.Data.TextDataViewType), [System.DateTime](xref:System.DateTime) and [key](xref:Microsoft.ML.Data.KeyDataViewType) type. |
+    ///
+    /// Check the See Also section for links to usage examples.
+    /// ]]></format>
+    /// </remarks>
+    /// <seealso cref="ConversionsExtensionsCatalog.ConvertType(TransformsCatalog.ConversionTransforms, InputOutputColumnPair[], DataKind)"/>
+    /// <seealso cref="ConversionsExtensionsCatalog.ConvertType(TransformsCatalog.ConversionTransforms, string, string, DataKind)"/>
     public sealed class TypeConvertingEstimator : TrivialEstimator<TypeConvertingTransformer>
     {
         internal sealed class Defaults

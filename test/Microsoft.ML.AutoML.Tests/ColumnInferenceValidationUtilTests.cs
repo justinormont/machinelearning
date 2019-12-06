@@ -5,25 +5,24 @@
 using System;
 using System.IO;
 using Microsoft.ML.Data;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Xunit;
 
 namespace Microsoft.ML.AutoML.Test
 {
-    [TestClass]
+    
     public class ColumnInferenceValidationUtilTests
     {
-        [TestMethod]
-        [ExpectedException(typeof(ArgumentException))]
+        [Fact]
         public void ValidateColumnNotContainedInData()
         {
             var schemaBuilder = new DataViewSchema.Builder();
             schemaBuilder.AddColumn(DefaultColumnNames.Features, NumberDataViewType.Single);
             schemaBuilder.AddColumn(DefaultColumnNames.Label, NumberDataViewType.Single);
             var schema = schemaBuilder.ToSchema();
-            var dataView = new EmptyDataView(new MLContext(), schema);
+            var dataView = DataViewTestFixture.BuildDummyDataView(schema);
             var columnInfo = new ColumnInformation();
             columnInfo.CategoricalColumnNames.Add("Categorical");
-            ColumnInferenceValidationUtil.ValidateSpecifiedColumnsExist(columnInfo, dataView);
+            Assert.Throws<ArgumentException>(() => ColumnInferenceValidationUtil.ValidateSpecifiedColumnsExist(columnInfo, dataView));
         }
     }
 }

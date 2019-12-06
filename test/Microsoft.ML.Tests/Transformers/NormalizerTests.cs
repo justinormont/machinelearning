@@ -3,20 +3,22 @@
 // See the LICENSE file in the project root for more information.
 
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
-using Microsoft.ML;
 using Microsoft.ML.Data;
 using Microsoft.ML.Data.IO;
 using Microsoft.ML.Experimental;
 using Microsoft.ML.Model;
 using Microsoft.ML.RunTests;
-using Microsoft.ML.StaticPipe;
 using Microsoft.ML.TestFramework.Attributes;
+using Microsoft.ML.TestFrameworkCommon;
 using Microsoft.ML.Tools;
 using Microsoft.ML.Transforms;
+using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
+using static Microsoft.ML.Transforms.NormalizingTransformer;
 
 namespace Microsoft.ML.Tests.Transformers
 {
@@ -410,10 +412,10 @@ namespace Microsoft.ML.Tests.Transformers
             var data4 = est4.Fit(data).Transform(data);
             var data5 = est5.Fit(data).Transform(data);
 
-            CheckSameSchemas(data1.Schema, data2.Schema);
-            CheckSameSchemas(data1.Schema, data3.Schema);
-            CheckSameSchemas(data1.Schema, data4.Schema);
-            CheckSameSchemas(data1.Schema, data5.Schema);
+            TestCommon.CheckSameSchemas(data1.Schema, data2.Schema);
+            TestCommon.CheckSameSchemas(data1.Schema, data3.Schema);
+            TestCommon.CheckSameSchemas(data1.Schema, data4.Schema);
+            TestCommon.CheckSameSchemas(data1.Schema, data5.Schema);
             CheckSameValues(data1, data2);
             CheckSameValues(data1, data3);
             CheckSameValues(data1, data4);
@@ -427,8 +429,8 @@ namespace Microsoft.ML.Tests.Transformers
             var data6 = est6.Fit(data).Transform(data);
             var data7 = est7.Fit(data).Transform(data);
             var data8 = est8.Fit(data).Transform(data);
-            CheckSameSchemas(data6.Schema, data7.Schema);
-            CheckSameSchemas(data6.Schema, data8.Schema);
+            TestCommon.CheckSameSchemas(data6.Schema, data7.Schema);
+            TestCommon.CheckSameSchemas(data6.Schema, data8.Schema);
             CheckSameValues(data6, data7);
             CheckSameValues(data6, data8);
 
@@ -440,8 +442,8 @@ namespace Microsoft.ML.Tests.Transformers
             var data9 = est9.Fit(data).Transform(data);
             var data10 = est10.Fit(data).Transform(data);
             var data11 = est11.Fit(data).Transform(data);
-            CheckSameSchemas(data9.Schema, data10.Schema);
-            CheckSameSchemas(data9.Schema, data11.Schema);
+            TestCommon.CheckSameSchemas(data9.Schema, data10.Schema);
+            TestCommon.CheckSameSchemas(data9.Schema, data11.Schema);
             CheckSameValues(data9, data10);
             CheckSameValues(data9, data11);
 
@@ -453,8 +455,8 @@ namespace Microsoft.ML.Tests.Transformers
             var data12 = est12.Fit(data).Transform(data);
             var data13 = est13.Fit(data).Transform(data);
             var data14 = est14.Fit(data).Transform(data);
-            CheckSameSchemas(data12.Schema, data13.Schema);
-            CheckSameSchemas(data12.Schema, data14.Schema);
+            TestCommon.CheckSameSchemas(data12.Schema, data13.Schema);
+            TestCommon.CheckSameSchemas(data12.Schema, data14.Schema);
             CheckSameValues(data12, data13);
             CheckSameValues(data12, data14);
 
@@ -466,8 +468,8 @@ namespace Microsoft.ML.Tests.Transformers
             var data15 = est15.Fit(data).Transform(data);
             var data16 = est16.Fit(data).Transform(data);
             var data17 = est17.Fit(data).Transform(data);
-            CheckSameSchemas(data15.Schema, data16.Schema);
-            CheckSameSchemas(data15.Schema, data17.Schema);
+            TestCommon.CheckSameSchemas(data15.Schema, data16.Schema);
+            TestCommon.CheckSameSchemas(data15.Schema, data17.Schema);
             CheckSameValues(data15, data16);
             CheckSameValues(data15, data17);
 
@@ -492,8 +494,8 @@ namespace Microsoft.ML.Tests.Transformers
             // Normalizer Extensions
             var est1 = ML.Transforms.NormalizeMinMax("float4", "float4");
             var est2 = ML.Transforms.NormalizeMeanVariance("float4", "float4");
-            var est3 = ML.Transforms.NormalizeLogMeanVariance("float4", "float4"); 
-            var est4 = ML.Transforms.NormalizeBinning("float4", "float4"); 
+            var est3 = ML.Transforms.NormalizeLogMeanVariance("float4", "float4");
+            var est4 = ML.Transforms.NormalizeBinning("float4", "float4");
             var est5 = ML.Transforms.NormalizeSupervisedBinning("float4", "float4");
 
             // Normalizer Extensions (Experimental)
@@ -503,7 +505,7 @@ namespace Microsoft.ML.Tests.Transformers
             var est9 = ML.Transforms.NormalizeBinning("float4", "float4");
             var est10 = ML.Transforms.NormalizeSupervisedBinning("float4", "float4");
 
-            // Fit and Transpose 
+            // Fit and Transpose
             var data1 = est1.Fit(data).Transform(data);
             var data2 = est2.Fit(data).Transform(data);
             var data3 = est3.Fit(data).Transform(data);
@@ -516,11 +518,11 @@ namespace Microsoft.ML.Tests.Transformers
             var data10 = est10.Fit(data).Transform(data);
 
             // Schema Checks
-            CheckSameSchemas(data1.Schema, data6.Schema);
-            CheckSameSchemas(data2.Schema, data7.Schema);
-            CheckSameSchemas(data3.Schema, data8.Schema);
-            CheckSameSchemas(data4.Schema, data9.Schema);
-            CheckSameSchemas(data5.Schema, data10.Schema);
+            TestCommon.CheckSameSchemas(data1.Schema, data6.Schema);
+            TestCommon.CheckSameSchemas(data2.Schema, data7.Schema);
+            TestCommon.CheckSameSchemas(data3.Schema, data8.Schema);
+            TestCommon.CheckSameSchemas(data4.Schema, data9.Schema);
+            TestCommon.CheckSameSchemas(data5.Schema, data10.Schema);
 
             // Value Checks
             CheckSameValues(data1, data6);
@@ -560,26 +562,26 @@ namespace Microsoft.ML.Tests.Transformers
         public void LpGcNormAndWhiteningWorkout()
         {
             string dataSource = GetDataPath(TestDatasets.generatedRegressionDataset.trainFilename);
-            var data = TextLoaderStatic.CreateLoader(ML,
-                c => (label: c.LoadFloat(11), features: c.LoadFloat(0, 10)),
-                separator: ';', hasHeader: true)
-                .Load(dataSource);
+            var data = ML.Data.LoadFromTextFile(dataSource, new[] {
+                new TextLoader.Column("label", DataKind.Single, 11),
+                new TextLoader.Column("features", DataKind.Single, 0, 10)
+            }, hasHeader: true, separatorChar: ';');
 
-            var invalidData = TextLoaderStatic.CreateLoader(ML,
-                c => (label: c.LoadFloat(11), features: c.LoadText(0, 10)),
-                separator: ';', hasHeader: true)
-                .Load(dataSource);
+            var invalidData = ML.Data.LoadFromTextFile(dataSource, new[] {
+                new TextLoader.Column("label", DataKind.Single, 11),
+                new TextLoader.Column("features", DataKind.String, 0, 10)
+            }, hasHeader: true, separatorChar: ';');
 
             var est = ML.Transforms.NormalizeLpNorm("lpnorm", "features")
                 .Append(ML.Transforms.NormalizeGlobalContrast("gcnorm", "features"))
                 .Append(new VectorWhiteningEstimator(ML, "whitened", "features"));
-            TestEstimatorCore(est, data.AsDynamic, invalidInput: invalidData.AsDynamic);
+            TestEstimatorCore(est, data, invalidInput: invalidData);
 
             var outputPath = GetOutputPath("NormalizerEstimator", "lpnorm_gcnorm_whitened.tsv");
             using (var ch = Env.Start("save"))
             {
                 var saver = new TextSaver(ML, new TextSaver.Arguments { Silent = true, OutputHeader = false });
-                var savedData = ML.Data.TakeRows(est.Fit(data.AsDynamic).Transform(data.AsDynamic), 4);
+                var savedData = ML.Data.TakeRows(est.Fit(data).Transform(data), 4);
                 savedData = ML.Transforms.SelectColumns("lpnorm", "gcnorm", "whitened").Fit(savedData).Transform(savedData);
 
                 using (var fs = File.Create(outputPath))
@@ -594,25 +596,26 @@ namespace Microsoft.ML.Tests.Transformers
         public void WhiteningWorkout()
         {
             string dataSource = GetDataPath(TestDatasets.generatedRegressionDataset.trainFilename);
-            var data = TextLoaderStatic.CreateLoader(ML,
-                c => (label: c.LoadFloat(11), features: c.LoadFloat(0, 10)),
-                separator: ';', hasHeader: true)
-                .Load(dataSource);
+            var data = ML.Data.LoadFromTextFile(dataSource, new[] {
+                new TextLoader.Column("label", DataKind.Single, 11),
+                new TextLoader.Column("features", DataKind.Single, 0, 10)
+            }, hasHeader: true, separatorChar: ';');
 
-            var invalidData = TextLoaderStatic.CreateLoader(ML,
-                c => (label: c.LoadFloat(11), features: c.LoadText(0, 10)),
-                separator: ';', hasHeader: true)
-                .Load(dataSource);
+            var invalidData = ML.Data.LoadFromTextFile(dataSource, new[] {
+                new TextLoader.Column("label", DataKind.Single, 11),
+                new TextLoader.Column("features", DataKind.String, 0, 10)
+            }, hasHeader: true, separatorChar: ';');
+
 
             var est = new VectorWhiteningEstimator(ML, "whitened1", "features")
                 .Append(new VectorWhiteningEstimator(ML, "whitened2", "features", kind: WhiteningKind.PrincipalComponentAnalysis, rank: 5));
-            TestEstimatorCore(est, data.AsDynamic, invalidInput: invalidData.AsDynamic);
+            TestEstimatorCore(est, data, invalidInput: invalidData);
 
             var outputPath = GetOutputPath("NormalizerEstimator", "whitened.tsv");
             using (var ch = Env.Start("save"))
             {
                 var saver = new TextSaver(ML, new TextSaver.Arguments { Silent = true, OutputHeader = false });
-                var savedData = ML.Data.TakeRows(est.Fit(data.AsDynamic).Transform(data.AsDynamic), 4);
+                var savedData = ML.Data.TakeRows(est.Fit(data).Transform(data), 4);
                 savedData = ML.Transforms.SelectColumns("whitened1", "whitened2").Fit(savedData).Transform(savedData);
 
                 using (var fs = File.Create(outputPath))
@@ -635,10 +638,11 @@ namespace Microsoft.ML.Tests.Transformers
         public void TestWhiteningOldSavingAndLoading()
         {
             string dataSource = GetDataPath(TestDatasets.generatedRegressionDataset.trainFilename);
-            var dataView = TextLoaderStatic.CreateLoader(ML,
-                c => (label: c.LoadFloat(11), features: c.LoadFloat(0, 10)),
-                separator: ';', hasHeader: true)
-                .Load(dataSource).AsDynamic;
+            var dataView = ML.Data.LoadFromTextFile(dataSource, new[] {
+                new TextLoader.Column("label", DataKind.Single, 11),
+                new TextLoader.Column("features", DataKind.Single, 0, 10)
+            }, hasHeader: true, separatorChar: ';');
+
             var pipe = new VectorWhiteningEstimator(ML, "whitened", "features");
 
             var result = pipe.Fit(dataView).Transform(dataView);
@@ -656,25 +660,25 @@ namespace Microsoft.ML.Tests.Transformers
         public void LpNormWorkout()
         {
             string dataSource = GetDataPath(TestDatasets.generatedRegressionDataset.trainFilename);
-            var data = TextLoaderStatic.CreateLoader(ML,
-                c => (label: c.LoadFloat(11), features: c.LoadFloat(0, 10)),
-                separator: ';', hasHeader: true)
-                .Load(dataSource);
+            var data = ML.Data.LoadFromTextFile(dataSource, new[] {
+                new TextLoader.Column("label", DataKind.Single, 11),
+                new TextLoader.Column("features", DataKind.Single, 0, 10)
+            }, hasHeader: true, separatorChar: ';');
 
-            var invalidData = TextLoaderStatic.CreateLoader(ML,
-                c => (label: c.LoadFloat(11), features: c.LoadText(0, 10)),
-                separator: ';', hasHeader: true)
-                .Load(dataSource);
+            var invalidData = ML.Data.LoadFromTextFile(dataSource, new[] {
+                new TextLoader.Column("label", DataKind.Single, 11),
+                new TextLoader.Column("features", DataKind.String, 0, 10)
+            }, hasHeader: true, separatorChar: ';');
 
             var est = ML.Transforms.NormalizeLpNorm("lpNorm1", "features")
                 .Append(ML.Transforms.NormalizeLpNorm("lpNorm2", "features", norm: LpNormNormalizingEstimatorBase.NormFunction.L1, ensureZeroMean: true));
-            TestEstimatorCore(est, data.AsDynamic, invalidInput: invalidData.AsDynamic);
+            TestEstimatorCore(est, data, invalidInput: invalidData);
 
             var outputPath = GetOutputPath("NormalizerEstimator", "lpNorm.tsv");
             using (var ch = Env.Start("save"))
             {
                 var saver = new TextSaver(ML, new TextSaver.Arguments { Silent = true, OutputHeader = false });
-                var savedData = ML.Data.TakeRows(est.Fit(data.AsDynamic).Transform(data.AsDynamic), 4);
+                var savedData = ML.Data.TakeRows(est.Fit(data).Transform(data), 4);
                 savedData = ML.Transforms.SelectColumns("lpNorm1", "lpNorm2").Fit(savedData).Transform(savedData);
 
                 using (var fs = File.Create(outputPath))
@@ -695,10 +699,11 @@ namespace Microsoft.ML.Tests.Transformers
         public void TestLpNormOldSavingAndLoading()
         {
             string dataSource = GetDataPath(TestDatasets.generatedRegressionDataset.trainFilename);
-            var dataView = TextLoaderStatic.CreateLoader(ML,
-                c => (label: c.LoadFloat(11), features: c.LoadFloat(0, 10)),
-                separator: ';', hasHeader: true)
-                .Load(dataSource).AsDynamic;
+            var dataView = ML.Data.LoadFromTextFile(dataSource, new[] {
+                new TextLoader.Column("label", DataKind.Single, 11),
+                new TextLoader.Column("features", DataKind.Single, 0, 10)
+            }, hasHeader: true, separatorChar: ';');
+
             var pipe = ML.Transforms.NormalizeLpNorm("whitened", "features");
 
             var result = pipe.Fit(dataView).Transform(dataView);
@@ -715,25 +720,25 @@ namespace Microsoft.ML.Tests.Transformers
         public void GcnWorkout()
         {
             string dataSource = GetDataPath(TestDatasets.generatedRegressionDataset.trainFilename);
-            var data = TextLoaderStatic.CreateLoader(ML,
-                c => (label: c.LoadFloat(11), features: c.LoadFloat(0, 10)),
-                separator: ';', hasHeader: true)
-                .Load(dataSource);
+            var data = ML.Data.LoadFromTextFile(dataSource, new[] {
+                new TextLoader.Column("label", DataKind.Single, 11),
+                new TextLoader.Column("features", DataKind.Single, 0, 10)
+            }, hasHeader: true, separatorChar: ';');
 
-            var invalidData = TextLoaderStatic.CreateLoader(ML,
-                c => (label: c.LoadFloat(11), features: c.LoadText(0, 10)),
-                separator: ';', hasHeader: true)
-                .Load(dataSource);
+            var invalidData = ML.Data.LoadFromTextFile(dataSource, new[] {
+                new TextLoader.Column("label", DataKind.Single, 11),
+                new TextLoader.Column("features", DataKind.String, 0, 10)
+            }, hasHeader: true, separatorChar: ';');
 
             var est = ML.Transforms.NormalizeGlobalContrast("gcnNorm1", "features")
                 .Append(ML.Transforms.NormalizeGlobalContrast("gcnNorm2", "features", ensureZeroMean: false, ensureUnitStandardDeviation: true, scale: 3));
-            TestEstimatorCore(est, data.AsDynamic, invalidInput: invalidData.AsDynamic);
+            TestEstimatorCore(est, data, invalidInput: invalidData);
 
             var outputPath = GetOutputPath("NormalizerEstimator", "gcnNorm.tsv");
             using (var ch = Env.Start("save"))
             {
                 var saver = new TextSaver(ML, new TextSaver.Arguments { Silent = true, OutputHeader = false });
-                var savedData = ML.Data.TakeRows(est.Fit(data.AsDynamic).Transform(data.AsDynamic), 4);
+                var savedData = ML.Data.TakeRows(est.Fit(data).Transform(data), 4);
                 savedData = ML.Transforms.SelectColumns("gcnNorm1", "gcnNorm2").Fit(savedData).Transform(savedData);
 
                 using (var fs = File.Create(outputPath))
@@ -754,10 +759,11 @@ namespace Microsoft.ML.Tests.Transformers
         public void TestGcnNormOldSavingAndLoading()
         {
             string dataSource = GetDataPath(TestDatasets.generatedRegressionDataset.trainFilename);
-            var dataView = TextLoaderStatic.CreateLoader(ML,
-                c => (label: c.LoadFloat(11), features: c.LoadFloat(0, 10)),
-                separator: ';', hasHeader: true)
-                .Load(dataSource).AsDynamic;
+            var dataView = ML.Data.LoadFromTextFile(dataSource, new[] {
+                new TextLoader.Column("label", DataKind.Single, 11),
+                new TextLoader.Column("features", DataKind.Single, 0, 10)
+            }, hasHeader: true, separatorChar: ';');
+
             var pipe = ML.Transforms.NormalizeGlobalContrast("whitened", "features");
 
             var result = pipe.Fit(dataView).Transform(dataView);
@@ -781,6 +787,192 @@ namespace Microsoft.ML.Tests.Transformers
                 var result = ModelFileUtils.LoadTransforms(Env, dataView, fs);
                 Assert.Equal(3, result.Schema.Count);
             }
+        }
+
+        private sealed class DataPointVec
+        {
+            [VectorType(5)]
+            public float[] Features { get; set; }
+        }
+
+        private sealed class DataPointOne
+        {
+            public float Features { get; set; }
+        }
+
+        [Fact]
+        void TestNormalizeLogMeanVarianceFixZeroOne()
+        {
+            var samples = new List<DataPointOne>()
+            {
+                new DataPointOne(){ Features = 1f },
+                new DataPointOne(){ Features = 2f },
+                new DataPointOne(){ Features = 0f },
+                new DataPointOne(){ Features = -1 }
+            };
+            // Convert training data to IDataView, the general data type used in ML.NET.
+            var data = ML.Data.LoadFromEnumerable(samples);
+            // NormalizeLogMeanVariance normalizes the data based on the computed mean and variance of the logarithm of the data.
+            // Uses Cumulative distribution function as output.
+            var normalize = ML.Transforms.NormalizeLogMeanVariance("Features", true, useCdf: true);
+
+            // NormalizeLogMeanVariance normalizes the data based on the computed mean and variance of the logarithm of the data.
+            var normalizeNoCdf = ML.Transforms.NormalizeLogMeanVariance("Features", true, useCdf: false);
+
+            // Now we can transform the data and look at the output to confirm the behavior of the estimator.
+            var normalizeTransform = normalize.Fit(data);
+            var transformedData = normalizeTransform.Transform(data);
+            var normalizeNoCdfTransform = normalizeNoCdf.Fit(data);
+            var noCdfData = normalizeNoCdfTransform.Transform(data);
+
+            var transformParams = normalizeTransform.GetNormalizerModelParameters(0) as CdfNormalizerModelParameters<float>;
+            var noCdfParams = normalizeNoCdfTransform.GetNormalizerModelParameters(0) as AffineNormalizerModelParameters<float>;
+
+            // Standard deviation and offset should not be zero for the given data even when FixZero is set to true.
+            Assert.NotEqual(0f, transformParams.Mean);
+            Assert.NotEqual(0f, transformParams.StandardDeviation);
+
+            // Offset should be zero when FixZero is set to true but not the scale (on this data).
+            Assert.Equal(0f, noCdfParams.Offset);
+            Assert.NotEqual(0f, noCdfParams.Scale);
+
+            var transformedDataArray = ML.Data.CreateEnumerable<DataPointOne>(noCdfData, false).ToImmutableArray();
+            // Without the Cdf and fixing zero, any 0 should stay 0.
+            Assert.Equal(0f, transformedDataArray[2].Features);
+        }
+
+        [Fact]
+        void TestNormalizeLogMeanVarianceFixZeroVec()
+        {
+            var samples = new List<DataPointVec>()
+            {
+                new DataPointVec(){ Features = new float[5] { 1, 1, 3, 0, float.MaxValue } },
+                new DataPointVec(){ Features = new float[5] { 2, 2, 2, 0, float.MinValue } },
+                new DataPointVec(){ Features = new float[5] { 0, 0, 1, 0.5f, 0} },
+                new DataPointVec(){ Features = new float[5] {-1,-1,-1, 1, 1} }
+            };
+            // Convert training data to IDataView, the general data type used in ML.NET.
+            var data = ML.Data.LoadFromEnumerable(samples);
+            // NormalizeLogMeanVariance normalizes the data based on the computed mean and variance of the logarithm of the data.
+            // Uses Cumulative distribution function as output.
+            var normalize = ML.Transforms.NormalizeLogMeanVariance("Features", true, useCdf: true);
+
+            // NormalizeLogMeanVariance normalizes the data based on the computed mean and variance of the logarithm of the data.
+            var normalizeNoCdf = ML.Transforms.NormalizeLogMeanVariance("Features", true, useCdf: false);
+
+            // Now we can transform the data and look at the output to confirm the behavior of the estimator.
+            var normalizeTransform = normalize.Fit(data);
+            var transformedData = normalizeTransform.Transform(data);
+            var normalizeNoCdfTransform = normalizeNoCdf.Fit(data);
+            var noCdfData = normalizeNoCdfTransform.Transform(data);
+
+            var transformParams = normalizeTransform.GetNormalizerModelParameters(0) as CdfNormalizerModelParameters<ImmutableArray<float>>;
+            var noCdfParams = normalizeNoCdfTransform.GetNormalizerModelParameters(0) as AffineNormalizerModelParameters<ImmutableArray<float>>;
+
+            for (int i = 0; i < 5; i++)
+            {
+                // Standard deviation and offset should not be zero for the given data even when FixZero is set to true.
+                Assert.NotEqual(0f, transformParams.Mean[i]);
+                Assert.NotEqual(0f, transformParams.StandardDeviation[i]);
+
+                // Offset should be zero when FixZero is set to true but not the scale (on this data).
+                Assert.Empty(noCdfParams.Offset);
+                Assert.NotEqual(0f, noCdfParams.Scale[i]);
+            }
+
+            var transformedDataArray = ML.Data.CreateEnumerable<DataPointVec>(noCdfData, false).ToImmutableArray();
+            // Without the Cdf and fixing zero, any 0 should stay 0.
+            Assert.Equal(0f, transformedDataArray[0].Features[3]);
+            Assert.Equal(0f, transformedDataArray[1].Features[3]);
+            Assert.Equal(0f, transformedDataArray[2].Features[0]);
+            Assert.Equal(0f, transformedDataArray[2].Features[1]);
+            Assert.Equal(0f, transformedDataArray[2].Features[4]);
+        }
+
+        [Fact]
+        public void TestNormalizeBackCompatibility2()
+        {
+            // Tests backward compatibility with a normalizing transformer
+            // whose version is "verWrittenCur: 0x00010001"
+
+            string dataPath = GetDataPath(TestDatasets.iris.trainFilename);
+
+            var loader = new TextLoader(Env, new TextLoader.Options
+            {
+                Columns = new[] {
+                    new TextLoader.Column("float1", DataKind.Single, 1),
+                    new TextLoader.Column("float4", DataKind.Single, new[]{new TextLoader.Range(1, 4) }),
+                    new TextLoader.Column("double1", DataKind.Double, 1),
+                    new TextLoader.Column("double4", DataKind.Double, new[]{new TextLoader.Range(1, 4) }),
+                    new TextLoader.Column("int1", DataKind.Int32, 0),
+                },
+                HasHeader = true
+            }, new MultiFileSource(dataPath));
+
+            var data = loader.Load(dataPath);
+
+            var modelPath = Path.Combine("TestModels", "normalizer_verwrit-00010001.zip");
+            var normalizer = ML.Model.Load(modelPath, out var schema);
+
+            var outputPath = GetOutputPath("NormalizerEstimator", "normalized2.tsv");
+            using (var ch = Env.Start("save"))
+            {
+                var saver = new TextSaver(Env, new TextSaver.Arguments { Silent = true });
+                using (var fs = File.Create(outputPath))
+                {
+                    var transformedData = normalizer.Transform(data);
+                    DataSaverUtils.SaveDataView(ch, saver, transformedData, fs, keepHidden: true);
+                }
+            }
+
+            CheckEquality("NormalizerEstimator", "normalized2.tsv", "normalized.tsv");
+
+            Done();
+        }
+
+        public class TensorData
+        {
+            private const int dim1 = 2;
+            private const int dim2 = 3;
+            private const int dim3 = 4;
+            private const int size = dim1 * dim2 * dim3;
+
+            [VectorType(dim1, dim2, dim3)]
+            public float[] input { get; set; }
+
+            public static TensorData[] GetTensorData()
+            {
+                var tensor1 = Enumerable.Range(0, size).Select(
+                x => (float)x).ToArray();
+
+                var tensor2 = Enumerable.Range(0, size).Select(
+                x => (float)(x + 10000)).ToArray();
+
+                return new TensorData[]
+                {
+                    new TensorData() { input = tensor1},
+                    new TensorData() { input = tensor2}
+                };
+            }
+        }
+
+        [Fact]
+        void TestSavingNormalizerWithMultidimensionalVectorInput()
+        {
+            var samples = TensorData.GetTensorData();
+            var data = ML.Data.LoadFromEnumerable(samples);
+            var model = ML.Transforms.NormalizeMinMax("output", "input").Fit(data);
+            var transformedData = model.Transform(data);
+
+            var modelAndSchemaPath = GetOutputPath("TestSavingNormalizerWithMultidimensionalVectorInput.zip");
+            ML.Model.Save(model, data.Schema, modelAndSchemaPath);
+            var loadedModel = ML.Model.Load(modelAndSchemaPath, out var schema);
+            var transformedData2 = loadedModel.Transform(data);
+
+            var dimensions1 = (transformedData.Schema["output"].Type as VectorDataViewType).Dimensions;
+            var dimensions2 = (transformedData2.Schema["output"].Type as VectorDataViewType).Dimensions;
+
+            Assert.True(dimensions1.SequenceEqual(dimensions2));
         }
     }
 }

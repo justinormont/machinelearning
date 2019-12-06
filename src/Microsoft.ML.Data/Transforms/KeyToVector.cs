@@ -31,7 +31,7 @@ using Newtonsoft.Json.Linq;
 namespace Microsoft.ML.Transforms
 {
     /// <summary>
-    /// Converts the key types back to their original vectors.
+    /// <see cref="ITransformer"/> resulting from fitting a <see cref="KeyToVectorMappingEstimator"/>.
     /// </summary>
     public sealed class KeyToVectorMappingTransformer : OneToOneTransformerBase
     {
@@ -305,7 +305,7 @@ namespace Microsoft.ML.Transforms
                     typeNames = null;
                 }
 
-                if (_parent._columns[iinfo].OutputCountVector || srcValueCount == 1)
+                if (_parent._columns[iinfo].OutputCountVector || srcType is PrimitiveDataViewType)
                 {
                     if (typeNames != null)
                     {
@@ -336,7 +336,7 @@ namespace Microsoft.ML.Transforms
                     builder.Add(AnnotationUtils.Kinds.CategoricalSlotRanges, AnnotationUtils.GetCategoricalType(srcValueCount), getter);
                 }
 
-                if (!_parent._columns[iinfo].OutputCountVector || srcValueCount == 1)
+                if (!_parent._columns[iinfo].OutputCountVector || srcType is PrimitiveDataViewType)
                 {
                     ValueGetter<bool> getter = (ref bool dst) =>
                     {
@@ -560,7 +560,7 @@ namespace Microsoft.ML.Transforms
                         int lenDst = checked(size * lenSrc);
                         var values = src.GetValues();
                         int cntSrc = values.Length;
-                        var editor = VBufferEditor.Create(ref dst, lenDst, cntSrc);
+                        var editor = VBufferEditor.Create(ref dst, lenDst, cntSrc, keepOldOnResize: false, requireIndicesOnDense: true);
 
                         int count = 0;
                         if (src.IsDense)
@@ -606,16 +606,11 @@ namespace Microsoft.ML.Transforms
                     ColInfo info = _infos[iinfo];
                     string inputColumnName = info.InputColumnName;
                     if (!ctx.ContainsColumn(inputColumnName))
-                    {
-                        ctx.RemoveColumn(info.Name, false);
                         continue;
-                    }
 
-                    if (!SaveAsOnnxCore(ctx, iinfo, info, ctx.GetVariableName(inputColumnName),
-                        ctx.AddIntermediateVariable(_types[iinfo], info.Name)))
-                    {
-                        ctx.RemoveColumn(info.Name, true);
-                    }
+                    var srcVariableName = ctx.GetVariableName(inputColumnName);
+                    var dstVariableName = ctx.AddIntermediateVariable(_types[iinfo], info.Name);
+                    SaveAsOnnxCore(ctx, iinfo, info, srcVariableName, dstVariableName);
                 }
             }
 
@@ -692,7 +687,7 @@ namespace Microsoft.ML.Transforms
                     PfaUtils.Call("cast.fanoutDouble", -1, 0, keyCount, false), PfaUtils.FuncRef("u." + funcName));
             }
 
-            private bool SaveAsOnnxCore(OnnxContext ctx, int iinfo, ColInfo info, string srcVariableName, string dstVariableName)
+            private void SaveAsOnnxCore(OnnxContext ctx, int iinfo, ColInfo info, string srcVariableName, string dstVariableName)
             {
                 var shape = ctx.RetrieveShapeOrNull(srcVariableName);
                 // Make sure that shape must present for calculating the reduction axes. The shape here is generally not null
@@ -703,8 +698,13 @@ namespace Microsoft.ML.Transforms
                 // default ONNX LabelEncoder just matches the behavior of Bag=false.
                 var encodedVariableName = _parent._columns[iinfo].OutputCountVector ? ctx.AddIntermediateVariable(null, "encoded", true) : dstVariableName;
 
-                string opType = "OneHotEncoder";
-                var node = ctx.CreateNode(opType, srcVariableName, encodedVariableName, ctx.GetNodeName(opType));
+                string opType = "Cast";
+                var castOutput = ctx.AddIntermediateVariable(info.TypeSrc, opType, true);
+                var castNode = ctx.CreateNode(opType, srcVariableName, castOutput, ctx.GetNodeName(opType), "");
+                castNode.AddAttribute("to", typeof(long));
+
+                opType = "OneHotEncoder";
+                var node = ctx.CreateNode(opType, castOutput, encodedVariableName, ctx.GetNodeName(opType));
                 node.AddAttribute("cats_int64s", Enumerable.Range(0, info.TypeSrc.GetItemType().GetKeyCountAsInt32(Host)).Select(x => (long)x));
                 node.AddAttribute("zeros", true);
                 if (_parent._columns[iinfo].OutputCountVector)
@@ -717,14 +717,31 @@ namespace Microsoft.ML.Transforms
                     reduceNode.AddAttribute("axes", new long[] { shape.Count - 1 });
                     reduceNode.AddAttribute("keepdims", 0);
                 }
-                return true;
             }
         }
     }
 
     /// <summary>
-    /// Estimator for <see cref="KeyToVectorMappingTransformer"/>. Converts the key types back to their original vectors.
+    /// Estimator for <see cref="KeyToVectorMappingTransformer"/>. Maps the value of a key
+    /// into a known-sized vector of <see cref="System.Single"/>.
     /// </summary>
+    /// <remarks>
+    /// <format type="text/markdown"><![CDATA[
+    /// ###  Estimator Characteristics
+    /// |  |  |
+    /// | -- | -- |
+    /// | Does this estimator need to look at the data to train its parameters? | No |
+    /// | Input column data type | Scalar or known-size vector of [key](xref:Microsoft.Ml.Data.KeyDataViewType) type. |
+    /// | Output column data type | A known-size vector of [System.Single](xref:System.Single). |
+    ///
+    /// It iterates over keys in data, and for each key it produces vector of key cardinality filled with zeros except position of key value in which it put's `1.0`.
+    /// For vector of keys it can either produce vector of counts for each key or concatenate them together into one vector.
+    ///
+    /// Check the See Also section for links to usage examples.
+    /// ]]></format>
+    /// </remarks>
+    /// <seealso cref=" ConversionsExtensionsCatalog.MapKeyToVector(TransformsCatalog.ConversionTransforms, InputOutputColumnPair[], bool)"/>
+    /// <seealso cref=" ConversionsExtensionsCatalog.MapKeyToVector(TransformsCatalog.ConversionTransforms, string, string, bool)"/>
     public sealed class KeyToVectorMappingEstimator : TrivialEstimator<KeyToVectorMappingTransformer>
     {
         internal static class Defaults
@@ -796,14 +813,16 @@ namespace Microsoft.ML.Transforms
 
                 var metadata = new List<SchemaShape.Column>();
                 if (col.Annotations.TryFindColumn(AnnotationUtils.Kinds.KeyValues, out var keyMeta))
-                    if (col.Kind != SchemaShape.Column.VectorKind.VariableVector && keyMeta.ItemType is TextDataViewType)
+                    if (((colInfo.OutputCountVector && col.IsKey) || col.Kind != SchemaShape.Column.VectorKind.VariableVector) && keyMeta.ItemType is TextDataViewType)
                         metadata.Add(new SchemaShape.Column(AnnotationUtils.Kinds.SlotNames, SchemaShape.Column.VectorKind.Vector, keyMeta.ItemType, false));
                 if (!colInfo.OutputCountVector && (col.Kind == SchemaShape.Column.VectorKind.Scalar || col.Kind == SchemaShape.Column.VectorKind.Vector))
                     metadata.Add(new SchemaShape.Column(AnnotationUtils.Kinds.CategoricalSlotRanges, SchemaShape.Column.VectorKind.Vector, NumberDataViewType.Int32, false));
                 if (!colInfo.OutputCountVector || (col.Kind == SchemaShape.Column.VectorKind.Scalar))
                     metadata.Add(new SchemaShape.Column(AnnotationUtils.Kinds.IsNormalized, SchemaShape.Column.VectorKind.Scalar, BooleanDataViewType.Instance, false));
 
-                result[colInfo.Name] = new SchemaShape.Column(colInfo.Name, SchemaShape.Column.VectorKind.Vector, NumberDataViewType.Single, false, new SchemaShape(metadata));
+                result[colInfo.Name] = new SchemaShape.Column(colInfo.Name,
+                    col.Kind == SchemaShape.Column.VectorKind.VariableVector && !colInfo.OutputCountVector ? SchemaShape.Column.VectorKind.VariableVector : SchemaShape.Column.VectorKind.Vector,
+                    NumberDataViewType.Single, false, new SchemaShape(metadata));
             }
 
             return new SchemaShape(result.Values);

@@ -4,6 +4,7 @@
 
 using Microsoft.ML.Data;
 using Microsoft.ML.RunTests;
+using Microsoft.ML.TestFrameworkCommon;
 using Microsoft.ML.Trainers;
 using Microsoft.ML.Transforms;
 using Microsoft.ML.Transforms.Text;
@@ -175,6 +176,18 @@ namespace Microsoft.ML.Tests.TrainerEstimators
             var pipeline = new TextFeaturizingEstimator(Env, "Features", "SentimentText");
 
             return (pipeline, data);
+        }
+
+        /// <summary>
+        /// Same data as <see cref="GetBinaryClassificationPipeline"/>, but with additional
+        /// OneHotEncoding to obtain categorical splits in tree models.
+        /// </summary>
+        private (IEstimator<ITransformer>, IDataView) GetOneHotBinaryClassificationPipeline()
+        {
+            var (pipeline, data) = GetBinaryClassificationPipeline();
+            var oneHotPipeline = pipeline.Append(ML.Transforms.Categorical.OneHotEncoding("Features"));
+
+            return (oneHotPipeline, data);
         }
 
 

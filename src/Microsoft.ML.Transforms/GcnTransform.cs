@@ -12,6 +12,7 @@ using Microsoft.ML.Data;
 using Microsoft.ML.EntryPoints;
 using Microsoft.ML.Internal.CpuMath;
 using Microsoft.ML.Internal.Utilities;
+using Microsoft.ML.Model.OnnxConverter;
 using Microsoft.ML.Runtime;
 using Microsoft.ML.Transforms;
 
@@ -35,17 +36,7 @@ using Microsoft.ML.Transforms;
 namespace Microsoft.ML.Transforms
 {
     /// <summary>
-    /// Lp-Norm (vector/row-wise) normalization transform. Has the following two set of arguments:
-    /// 1- Lp-Norm normalizer arguments:
-    ///    Normalize rows individually by rescaling them to unit norm (L2, L1 or LInf).
-    ///    Performs the following operation on a vector X:
-    ///         Y = (X - M) / D, where M is mean and D is either L2 norm, L1 norm or LInf norm.
-    ///    Scaling inputs to unit norms is a common operation for text classification or clustering.
-    /// 2- Global contrast normalization (GCN) arguments:
-    ///    Performs the following operation on a vector X:
-    ///         Y = (s * X - M) / D, where s is a scale, M is mean and D is either L2 norm or standard deviation.
-    ///    Usage examples and Matlab code:
-    ///    <a href="https://www.cs.stanford.edu/~acoates/papers/coatesleeng_aistats_2011.pdf">https://www.cs.stanford.edu/~acoates/papers/coatesleeng_aistats_2011.pdf</a>.
+    /// <see cref="ITransformer"/> resulting from fitting a <see cref="LpNormNormalizingEstimator"/> or <see cref="GlobalContrastNormalizingEstimator"/>.
     /// </summary>
     public sealed class LpNormNormalizingTransformer : OneToOneTransformerBase
     {
@@ -323,11 +314,13 @@ namespace Microsoft.ML.Transforms
 
         private protected override IRowMapper MakeRowMapper(DataViewSchema schema) => new Mapper(this, schema);
 
-        private sealed class Mapper : OneToOneMapperBase
+        private sealed class Mapper : OneToOneMapperBase, ISaveAsOnnx
         {
             private readonly DataViewType[] _srcTypes;
             private readonly int[] _srcCols;
             private readonly DataViewType[] _types;
+            private readonly LpNormNormalizingEstimatorBase.NormFunction[] _norms;
+            private readonly bool[] _ensureZeroMeans;
             private readonly LpNormNormalizingTransformer _parent;
 
             public Mapper(LpNormNormalizingTransformer parent, DataViewSchema inputSchema)
@@ -337,12 +330,16 @@ namespace Microsoft.ML.Transforms
                 _types = new DataViewType[_parent.ColumnPairs.Length];
                 _srcTypes = new DataViewType[_parent.ColumnPairs.Length];
                 _srcCols = new int[_parent.ColumnPairs.Length];
+                _norms = new LpNormNormalizingEstimatorBase.NormFunction[_parent.ColumnPairs.Length];
+                _ensureZeroMeans = new bool[_parent.ColumnPairs.Length];
                 for (int i = 0; i < _parent.ColumnPairs.Length; i++)
                 {
                     inputSchema.TryGetColumnIndex(_parent.ColumnPairs[i].inputColumnName, out _srcCols[i]);
                     var srcCol = inputSchema[_srcCols[i]];
                     _srcTypes[i] = srcCol.Type;
                     _types[i] = srcCol.Type;
+                    _norms[i] = _parent._columns[i].Norm;
+                    _ensureZeroMeans[i] = _parent._columns[i].EnsureZeroMean;
                 }
             }
 
@@ -604,6 +601,128 @@ namespace Microsoft.ML.Transforms
                     return 0;
                 return CpuMathUtils.Sum(src) / length;
             }
+
+            public bool CanSaveOnnx(OnnxContext ctx) => true;
+
+            public void SaveAsOnnx(OnnxContext ctx)
+            {
+                Host.CheckValue(ctx, nameof(ctx));
+
+                for (int iinfo = 0; iinfo < _srcCols.Length; ++iinfo)
+                {
+                    string inputColumnName = InputSchema[_srcCols[iinfo]].Name;
+                    if (!ctx.ContainsColumn(inputColumnName))
+                    {
+                        ctx.RemoveColumn(inputColumnName, false);
+                        continue;
+                    }
+
+                    if (!SaveAsOnnxCore(ctx, iinfo, ctx.GetVariableName(inputColumnName), ctx.AddIntermediateVariable(_srcTypes[iinfo], inputColumnName)))
+                    {
+                        ctx.RemoveColumn(inputColumnName, true);
+                    }
+                }
+            }
+
+            private bool SaveAsOnnxCore(OnnxContext ctx, int iinfo, string srcVariableName, string dstVariableName)
+            {
+                string opType;
+
+                if ((_norms[iinfo] != LpNormNormalizingEstimatorBase.NormFunction.StandardDeviation) && (_ensureZeroMeans[iinfo] == false))
+                {
+                    string strNorm;
+                    if (_norms[iinfo] == LpNormNormalizingEstimatorBase.NormFunction.L1)
+                        strNorm = "L1";
+                    else if (_norms[iinfo] == LpNormNormalizingEstimatorBase.NormFunction.L2)
+                        strNorm = "L2";
+                    else
+                        strNorm = "MAX";
+                    opType = "Normalizer";
+                    var node = ctx.CreateNode(opType, srcVariableName, dstVariableName, ctx.GetNodeName(opType));
+                    node.AddAttribute("norm", strNorm);
+                    return true;
+                }
+
+                opType = "ReduceMean";
+                string meanOfInput = ctx.AddIntermediateVariable(_types[iinfo], "MeanOfInput", true);
+                var meanNode = ctx.CreateNode(opType, srcVariableName, meanOfInput, ctx.GetNodeName(opType), "");
+                meanNode.AddAttribute("axes", new long[] { 1 });
+
+                opType = "Sub";
+                string inputMinusMean = ctx.AddIntermediateVariable(_types[iinfo], "InputMinusMean");
+                var subtractNode = ctx.CreateNode(opType, new[] { srcVariableName, meanOfInput }, new[] { inputMinusMean }, ctx.GetNodeName(opType), "");
+
+                if (_norms[iinfo] == LpNormNormalizingEstimatorBase.NormFunction.L1)
+                {
+                    opType = "Abs";
+                    string absOfInput = ctx.AddIntermediateVariable(_types[iinfo], "AbsOfInput");
+                    var absNode = ctx.CreateNode(opType, inputMinusMean, absOfInput, ctx.GetNodeName(opType), "");
+
+                    opType = "ReduceSum";
+                    string sumOfAbsOfInput = ctx.AddIntermediateVariable(_types[iinfo], "SumOfAbsOfInput", true);
+                    var sumOfAbsNode = ctx.CreateNode(opType, absOfInput, sumOfAbsOfInput, ctx.GetNodeName(opType), "");
+                    sumOfAbsNode.AddAttribute("axes", new long[] { 1 });
+
+                    opType = "Div";
+                    var l1Node = ctx.CreateNode(opType, new[] { inputMinusMean, sumOfAbsOfInput }, new[] { dstVariableName }, ctx.GetNodeName(opType), "");
+                }
+                else if (_norms[iinfo] == LpNormNormalizingEstimatorBase.NormFunction.L2)
+                {
+                    opType = "Pow";
+                    string two = ctx.AddInitializer(2.0f);
+                    string squareOfInput = ctx.AddIntermediateVariable(_types[iinfo], "SquareOfInput", true);
+                    var squareNode = ctx.CreateNode(opType, new[] { inputMinusMean, two }, new[] { squareOfInput }, ctx.GetNodeName(opType), "");
+
+                    opType = "ReduceSum";
+                    string sumOfSquares = ctx.AddIntermediateVariable(_types[iinfo], "SumOfSquares", true);
+                    var sumOfSquaresNode = ctx.CreateNode(opType, squareOfInput, sumOfSquares, ctx.GetNodeName(opType), "");
+                    sumOfSquaresNode.AddAttribute("axes", new long[] { 1 });
+
+                    opType = "Sqrt";
+                    string squareRoot = ctx.AddIntermediateVariable(_types[iinfo], "SquareRoot", true);
+                    var squareRootNode = ctx.CreateNode(opType, sumOfSquares, squareRoot, ctx.GetNodeName(opType), "");
+
+                    opType = "Div";
+                    var l2Node = ctx.CreateNode(opType, new[] { inputMinusMean, squareRoot }, new[] { dstVariableName }, ctx.GetNodeName(opType), "");
+                }
+                else if (_norms[iinfo] == LpNormNormalizingEstimatorBase.NormFunction.Infinity)
+                {
+                    opType = "ReduceMax";
+                    string maxOfInput = ctx.AddIntermediateVariable(_types[iinfo], "MaxOfInput", true);
+                    var maxNode = ctx.CreateNode(opType, inputMinusMean, maxOfInput, ctx.GetNodeName(opType), "");
+                    maxNode.AddAttribute("axes", new long[] { 1 });
+
+                    opType = "Div";
+                    var lMaxNode = ctx.CreateNode(opType, new[] { inputMinusMean, maxOfInput }, new[] { dstVariableName }, ctx.GetNodeName(opType), "");
+                }
+                else if (_norms[iinfo] == LpNormNormalizingEstimatorBase.NormFunction.StandardDeviation)
+                {
+                    // first calculate the standard deviation
+                    opType = "Pow";
+                    string two = ctx.AddInitializer(2.0f);
+                    string squareOfInputMinusMean = ctx.AddIntermediateVariable(_types[iinfo], "SquareOfInputMinusMean", true);
+                    var squareOfInputMinusMeanNode = ctx.CreateNode(opType, new[] { inputMinusMean, two }, new[] { squareOfInputMinusMean }, ctx.GetNodeName(opType), "");
+
+                    opType = "ReduceMean";
+                    string average = ctx.AddIntermediateVariable(_types[iinfo], "SumOfSquares", true);
+                    var sumOfSquaresNode = ctx.CreateNode(opType, squareOfInputMinusMean, average, ctx.GetNodeName(opType), "");
+                    sumOfSquaresNode.AddAttribute("axes", new long[] { 1 });
+
+                    opType = "Sqrt";
+                    string stdDev = ctx.AddIntermediateVariable(_types[iinfo], "SquareRoot", true);
+                    var stdDevNode = ctx.CreateNode(opType, average, stdDev, ctx.GetNodeName(opType), "");
+
+                    opType = "Div";
+                    string input = _ensureZeroMeans[iinfo] ? inputMinusMean : srcVariableName;
+                    var lStdDevNode = ctx.CreateNode(opType, new[] {input, stdDev }, new[] { dstVariableName }, ctx.GetNodeName(opType), "");
+                }
+                else
+                {
+                    Contracts.Assert(false);
+                    return false;
+                }
+                return true;
+            }
         }
     }
 
@@ -641,7 +760,7 @@ namespace Microsoft.ML.Transforms
     }
 
     /// <summary>
-    /// Base estimator class for LpNorm and Gcn normalizers.
+    /// Base estimator class for <see cref="LpNormNormalizingEstimator"/> and <see cref="GlobalContrastNormalizingEstimator"/> normalizers.
     /// </summary>
     public abstract class LpNormNormalizingEstimatorBase : TrivialEstimator<LpNormNormalizingTransformer>
     {
@@ -805,8 +924,41 @@ namespace Microsoft.ML.Transforms
     }
 
     /// <summary>
-    /// Lp Normalizing estimator takes columns and normalizes them individually by rescaling them to unit norm.
+    /// Normalizes (scales) vectors in the input column to the unit norm. The type of norm that is used can be specified by the user.
     /// </summary>
+    /// <remarks>
+    /// <format type="text/markdown"><![CDATA[
+    ///
+    /// ###  Estimator Characteristics
+    /// |  |  |
+    /// | -- | -- |
+    /// | Does this estimator need to look at the data to train its parameters? | No |
+    /// | Input column data type | Vector of <xref:System.Single> |
+    /// | Output column data type | Vector of <xref:System.Single> |
+    ///
+    ///
+    /// The resulting <xref:Microsoft.ML.Transforms.LpNormNormalizingTransformer> normalizes vectors in the input column individually
+    /// by rescaling them to the unit norm.
+    ///
+    /// Let $x$ be the input vector, $n$ the size of the vector, $L(x)$ the norm function selected by the user.
+    /// Let $\mu(x) = \sum_i x_i / n$ be the mean of the values of vector $x$. The <xref:Microsoft.ML.Transforms.LpNormNormalizingTransformer>
+    /// performs the following operation on each input vector $x$:
+    /// $y = \frac{x - \mu(x)}{L(x)}$
+    /// if the user specifies that the mean should be zero, or otherwise:
+    /// $y = \frac{x}{L(x)}$
+    ///
+    /// There are four types of norm that can be selected by the user to be applied on input vector $x$. They are defined as follows:
+    /// - <xref:Microsoft.ML.Transforms.LpNormNormalizingEstimatorBase.NormFunction.L1>: $L_1(x) = \sum_i |x_i|$
+    /// - <xref:Microsoft.ML.Transforms.LpNormNormalizingEstimatorBase.NormFunction.L2>: $L_2(x) = \sqrt{\sum_i x_i^2}$
+    /// - <xref:Microsoft.ML.Transforms.LpNormNormalizingEstimatorBase.NormFunction.Infinity>: $L_{\infty}(x) = \max_i\{|x_i|\}$
+    /// - <xref:Microsoft.ML.Transforms.LpNormNormalizingEstimatorBase.NormFunction.StandardDeviation>: $L_\sigma(x)$ is defined as the
+    /// standard deviation of the elements of the input vector $x$
+    ///
+    /// Check the See Also section for links to usage examples.
+    /// ]]>
+    /// </format>
+    /// </remarks>
+    /// <seealso cref="NormalizationCatalog.NormalizeLpNorm(TransformsCatalog, string, string, LpNormNormalizingEstimatorBase.NormFunction, bool)"/>
     public sealed class LpNormNormalizingEstimator : LpNormNormalizingEstimatorBase
     {
         /// <summary>
@@ -861,8 +1013,31 @@ namespace Microsoft.ML.Transforms
     }
 
     /// <summary>
-    /// Global contrast normalizing estimator takes columns and performs global constrast normalization.
+    /// Normalizes (scales) vectors in the input column applying the global contrast normalization.
     /// </summary>
+    /// <remarks>
+    /// <format type="text/markdown"><![CDATA[
+    ///
+    /// ###  Estimator Characteristics
+    /// |  |  |
+    /// | -- | -- |
+    /// | Does this estimator need to look at the data to train its parameters? | No |
+    /// | Input column data type | Vector of <xref:System.Single> |
+    /// | Output column data type | Vector of <xref:System.Single> |
+    ///
+    ///
+    /// The resulting <xref:Microsoft.ML.Transforms.LpNormNormalizingTransformer> normalizes vectors in the input column individually,
+    /// rescaling them by applying global contrast normalization. The transform performs the following operation on each input vector $x$:
+    /// $y = \frac{s * x - \mu(x)}{L(x)}$.
+    /// Where $s$ is a user provided scaling factor, $\mu(x)$ is the mean of the elements of vector $x$, and $L(x)$ is the $L_2$ norm or the
+    /// standard deviation of the elements of vector $x$. These settings can be specified by the user when the
+    /// <xref:Microsoft.ML.Transforms.GlobalContrastNormalizingEstimator> is initialized.
+    ///
+    /// Check the See Also section for links to usage examples.
+    /// ]]>
+    /// </format>
+    /// </remarks>
+    /// <seealso cref="NormalizationCatalog.NormalizeGlobalContrast(TransformsCatalog, string, string, bool, bool, float)"/>
     public sealed class GlobalContrastNormalizingEstimator : LpNormNormalizingEstimatorBase
     {
         /// <summary>

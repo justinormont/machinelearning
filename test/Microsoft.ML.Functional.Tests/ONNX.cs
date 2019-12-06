@@ -3,10 +3,10 @@
 // See the LICENSE file in the project root for more information.
 
 using System.IO;
+using Microsoft.ML.Data;
 using Microsoft.ML.Functional.Tests.Datasets;
-using Microsoft.ML.RunTests;
-using Microsoft.ML.TestFramework;
-using Microsoft.ML.TestFramework.Attributes;
+using Microsoft.ML.TestFrameworkCommon;
+using Microsoft.ML.TestFrameworkCommon.Attributes;
 using Microsoft.ML.Trainers;
 using Microsoft.ML.Trainers.FastTree;
 using Xunit;
@@ -14,7 +14,7 @@ using Xunit.Abstractions;
 
 namespace Microsoft.ML.Functional.Tests
 {
-    public class ONNX : BaseTestClass
+    public class ONNX : FunctionalTestBaseClass
     {
         public ONNX(ITestOutputHelper output) : base(output)
         {
@@ -29,7 +29,7 @@ namespace Microsoft.ML.Functional.Tests
             var mlContext = new MLContext(seed: 1);
 
             // Get the dataset.
-            var data = mlContext.Data.LoadFromTextFile<HousingRegression>(GetDataPath(TestDatasets.housing.trainFilename), hasHeader: true);
+            var data = mlContext.Data.LoadFromTextFile<HousingRegression>(TestCommon.GetDataPath(DataDir, TestDatasets.housing.trainFilename), hasHeader: true);
 
             // Create a pipeline to train on the housing data.
             var pipeline = mlContext.Transforms.Concatenate("Features", HousingRegression.Features)
@@ -43,23 +43,26 @@ namespace Microsoft.ML.Functional.Tests
 
             // Serialize the pipeline to a file.
             var modelFileName = "SaveOnnxLoadAndScoreFastTreeModel.onnx";
-            var modelPath = DeleteOutputPath(modelFileName);
+            var modelPath = TestCommon.DeleteOutputPath(OutDir, modelFileName);
             using (var file = File.Create(modelPath))
                 mlContext.Model.ConvertToOnnx(model, data, file);
 
             // Load the model as a transform.
-            var onnxEstimator = mlContext.Transforms.ApplyOnnxModel(modelPath);
+            // Note that when saving an ML.NET model as an ONNX model, the column types and column names will
+            // change. The name changes as ONNX doesn't not allow the same name for an input and output within the ONNX model.
+            // Therefore names maintained but have a number appended to the end of the name. In this case, Score0 is the output
+            // of the ONNX model. We are renaming Score0 to Score using Copy Columns.
+            // ONNX also uses tensors and will return an output of a tensor with the dimension of [1,1] for a single float.
+            // Therefore the VectorScoreColumn class (which contains a float [] field called Score) is used for the return
+            // type on the Prediction engine.
+            // See #2980 and #2981 for more information.
+            var onnxEstimator = mlContext.Transforms.ApplyOnnxModel(modelPath)
+                .Append(mlContext.Transforms.CopyColumns("Score", "Score0"));
             var onnxModel = onnxEstimator.Fit(data);
-
-            // TODO #2980: ONNX outputs don't match the outputs of the model, so we must hand-correct this for now.
-            // TODO #2981: ONNX models cannot be fit as part of a pipeline, so we must use a workaround like this.
-            var onnxWorkaroundPipeline = onnxModel.Append(
-                mlContext.Transforms.CopyColumns("Score", "Score0").Fit(onnxModel.Transform(data)));
 
             // Create prediction engine and test predictions.
             var originalPredictionEngine = mlContext.Model.CreatePredictionEngine<HousingRegression, ScoreColumn>(model);
-            // TODO #2982: ONNX produces vector types and not the original output type.
-            var onnxPredictionEngine = mlContext.Model.CreatePredictionEngine<HousingRegression, VectorScoreColumn>(onnxWorkaroundPipeline);
+            var onnxPredictionEngine = mlContext.Model.CreatePredictionEngine<HousingRegression, VectorScoreColumn>(onnxModel);
 
             // Take a handful of examples out of the dataset and compute predictions.
             var dataEnumerator = mlContext.Data.CreateEnumerable<HousingRegression>(mlContext.Data.TakeRows(data, 5), false);
@@ -81,7 +84,7 @@ namespace Microsoft.ML.Functional.Tests
             var mlContext = new MLContext(seed: 1);
 
             // Get the dataset.
-            var data = mlContext.Data.LoadFromTextFile<HousingRegression>(GetDataPath(TestDatasets.housing.trainFilename), hasHeader: true);
+            var data = mlContext.Data.LoadFromTextFile<HousingRegression>(TestCommon.GetDataPath(DataDir, TestDatasets.housing.trainFilename), hasHeader: true);
 
             // Create a pipeline to train on the housing data.
             var pipeline = mlContext.Transforms.Concatenate("Features", HousingRegression.Features)
@@ -95,7 +98,7 @@ namespace Microsoft.ML.Functional.Tests
 
             // Serialize the pipeline to a file.
             var modelFileName = "SaveOnnxLoadAndScoreKMeansModel.onnx";
-            var modelPath = DeleteOutputPath(modelFileName);
+            var modelPath = TestCommon.DeleteOutputPath(OutDir, modelFileName);
             using (var file = File.Create(modelPath))
                 mlContext.Model.ConvertToOnnx(model, data, file);
 
@@ -123,7 +126,7 @@ namespace Microsoft.ML.Functional.Tests
                 Common.AssertEqual(originalPrediction.Score, onnxPrediction.Score, precision: 4); // Note the low precision!
             }
         }
-    
+
         /// <summary>
         /// ONNX: Models can be serialized to ONNX, deserialized back to ML.NET, and used a pipeline.
         /// </summary>
@@ -133,7 +136,7 @@ namespace Microsoft.ML.Functional.Tests
             var mlContext = new MLContext(seed: 1);
 
             // Get the dataset.
-            var data = mlContext.Data.LoadFromTextFile<HousingRegression>(GetDataPath(TestDatasets.housing.trainFilename), hasHeader: true);
+            var data = mlContext.Data.LoadFromTextFile<HousingRegression>(TestCommon.GetDataPath(DataDir, TestDatasets.housing.trainFilename), hasHeader: true);
 
             // Create a pipeline to train on the housing data.
             var pipeline = mlContext.Transforms.Concatenate("Features", HousingRegression.Features)
@@ -147,7 +150,7 @@ namespace Microsoft.ML.Functional.Tests
 
             // Serialize the pipeline to a file.
             var modelFileName = "SaveOnnxLoadAndScoreSdcaModel.onnx";
-            var modelPath = DeleteOutputPath(modelFileName);
+            var modelPath = TestCommon.DeleteOutputPath(OutDir, modelFileName);
             using (var file = File.Create(modelPath))
                 mlContext.Model.ConvertToOnnx(model, data, file);
 

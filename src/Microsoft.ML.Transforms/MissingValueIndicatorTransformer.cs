@@ -10,6 +10,7 @@ using Microsoft.ML;
 using Microsoft.ML.CommandLine;
 using Microsoft.ML.Data;
 using Microsoft.ML.Internal.Utilities;
+using Microsoft.ML.Model.OnnxConverter;
 using Microsoft.ML.Runtime;
 using Microsoft.ML.Transforms;
 
@@ -27,7 +28,9 @@ using Microsoft.ML.Transforms;
 
 namespace Microsoft.ML.Transforms
 {
-    /// <include file='doc.xml' path='doc/members/member[@name="NAIndicator"]'/>
+    /// <summary>
+    /// <see cref="ITransformer"/> resulting from fitting a <see cref="MissingValueIndicatorEstimator"/>.
+    /// </summary>
     public sealed class MissingValueIndicatorTransformer : OneToOneTransformerBase
     {
         internal sealed class Column : OneToOneColumn
@@ -138,7 +141,7 @@ namespace Microsoft.ML.Transforms
 
         private protected override IRowMapper MakeRowMapper(DataViewSchema schema) => new Mapper(this, schema);
 
-        private sealed class Mapper : OneToOneMapperBase
+        private sealed class Mapper : OneToOneMapperBase, ISaveAsOnnx
         {
             private readonly MissingValueIndicatorTransformer _parent;
             private readonly ColInfo[] _infos;
@@ -424,9 +427,70 @@ namespace Microsoft.ML.Transforms
                     dst = editor.Commit();
                 }
             }
+
+            public bool CanSaveOnnx(OnnxContext ctx) => true;
+
+            public void SaveAsOnnx(OnnxContext ctx)
+            {
+                Host.CheckValue(ctx, nameof(ctx));
+
+                for (int iinfo = 0; iinfo < _infos.Length; ++iinfo)
+                {
+                    ColInfo info = _infos[iinfo];
+                    string inputColumnName = info.InputColumnName;
+                    if (!ctx.ContainsColumn(inputColumnName))
+                    {
+                        ctx.RemoveColumn(info.Name, false);
+                        continue;
+                    }
+
+                    if (!SaveAsOnnxCore(ctx, iinfo, info, ctx.GetVariableName(inputColumnName),
+                        ctx.AddIntermediateVariable(_infos[iinfo].OutputType, info.Name)))
+                    {
+                        ctx.RemoveColumn(info.Name, true);
+                    }
+                }
+            }
+
+            private bool SaveAsOnnxCore(OnnxContext ctx, int iinfo, ColInfo info, string srcVariableName, string dstVariableName)
+            {
+                var inputType = _infos[iinfo].InputType;
+                Type rawType = (inputType is VectorDataViewType vectorType) ? vectorType.ItemType.RawType : inputType.RawType;
+
+                if (rawType != typeof(float))
+                    return false;
+
+                string opType;
+                opType = "IsNaN";
+                var isNaNOutput = ctx.AddIntermediateVariable(BooleanDataViewType.Instance, "IsNaNOutput", true);
+                var nanNode = ctx.CreateNode(opType, srcVariableName, dstVariableName, ctx.GetNodeName(opType), "");
+
+                return true;
+            }
         }
     }
 
+    /// <summary>
+    /// <see cref="IEstimator{TTransformer}"/> for the <see cref="MissingValueIndicatorTransformer"/>.
+    /// </summary>
+    /// <remarks>
+    /// <format type="text/markdown"><![CDATA[
+    /// ###  Estimator Characteristics
+    /// |  |  |
+    /// | -- | -- |
+    /// | Does this estimator need to look at the data to train its parameters? | No |
+    /// | Input column data type | Vector or scalar value of <xref:System.Single> or <xref:System.Double> |
+    /// | Output column data type | If input column was scalar then <xref:System.Boolean> otherwise vector of <xref:System.Boolean>. |
+    ///
+    /// The resulting <xref:Microsoft.ML.Transforms.MissingValueIndicatorTransformer> creates a new column, named as specified in the output column name parameters, and
+    /// fills it with vector of bools where `true` in the i-th position in array indicates the i-th element in input column has missing value and `false` otherwise.
+    ///
+    /// Check the See Also section for links to usage examples.
+    /// ]]>
+    /// </format>
+    /// </remarks>
+    /// <seealso cref="ExtensionsCatalog.IndicateMissingValues(TransformsCatalog, string, string)" />
+    /// <seealso cref="ExtensionsCatalog.IndicateMissingValues(TransformsCatalog, InputOutputColumnPair[])" />
     public sealed class MissingValueIndicatorEstimator : TrivialEstimator<MissingValueIndicatorTransformer>
     {
         /// <summary>

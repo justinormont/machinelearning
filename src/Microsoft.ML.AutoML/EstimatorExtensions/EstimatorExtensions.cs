@@ -359,6 +359,7 @@ namespace Microsoft.ML.AutoML
         {
             var pipelineNode = new PipelineNode(EstimatorName.ValueToKeyMapping.ToString(),
                 PipelineNodeType.Transform, inColumn, outColumn);
+
             var estimator = CreateInstance(context, inColumn, outColumn);
             return new SuggestedTransform(pipelineNode, estimator);
         }
@@ -366,6 +367,31 @@ namespace Microsoft.ML.AutoML
         private static IEstimator<ITransformer> CreateInstance(MLContext context, string inColumn, string outColumn)
         {
             return context.Transforms.Conversion.MapValueToKey(outColumn, inColumn);
+        }
+    }
+
+    internal class ImageLoadingExtension : IEstimatorExtension
+    {
+        public static string ImageFolder { private get; set; }
+        public IEstimator<ITransformer> CreateInstance(MLContext context, PipelineNode pipelineNode)
+        {
+            return CreateInstance(context, pipelineNode.InColumns[0], pipelineNode.OutColumns[0]);
+        }
+
+        public static SuggestedTransform CreateSuggestedTransform(MLContext context, string inColumn, string outColumn)
+        {
+            var pipelineNodeProperty = new Dictionary<string, object>()
+            {
+                { "imageFolder", ImageFolder },
+            };
+            var pipelineNode = new PipelineNode(EstimatorName.ImageLoading.ToString(), PipelineNodeType.Transform, inColumn, outColumn, pipelineNodeProperty);
+            var estimator = CreateInstance(context, inColumn, outColumn);
+            return new SuggestedTransform(pipelineNode, estimator);
+        }
+
+        private static IEstimator<ITransformer> CreateInstance(MLContext context, string inColumn, string outColumn)
+        {
+            return context.Transforms.LoadRawImageBytes(outColumn, ImageFolder, inColumn);
         }
     }
 }

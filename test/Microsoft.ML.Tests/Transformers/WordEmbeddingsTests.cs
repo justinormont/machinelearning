@@ -5,6 +5,7 @@
 using System.IO;
 using Microsoft.ML.Data;
 using Microsoft.ML.RunTests;
+using Microsoft.ML.TestFrameworkCommon;
 using Microsoft.ML.Transforms.Text;
 using Xunit;
 using Xunit.Abstractions;
@@ -92,7 +93,7 @@ namespace Microsoft.ML.Tests.Transformers
 
             using (var fs = File.Create(outputPath))
                 ML.Data.SaveAsText(savedData, fs, headerRow: true, keepHidden: true);
-            CheckEquality("Text", "customWordEmbeddings.tsv");
+            CheckEquality("Text", "customWordEmbeddings.tsv", parseOption: NumberParseOption.UseSingle);
             Done();
         }
     }

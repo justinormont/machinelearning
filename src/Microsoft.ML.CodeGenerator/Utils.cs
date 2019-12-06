@@ -11,26 +11,10 @@ using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.ML.AutoML;
 using Microsoft.ML.Data;
 using NLog;
-
 namespace Microsoft.ML.CodeGenerator.Utilities
 {
     internal class Utils
     {
-        internal static LogLevel GetVerbosity(string verbosity)
-        {
-            switch (verbosity)
-            {
-                case "q":
-                    return LogLevel.Warn;
-                case "m":
-                    return LogLevel.Info;
-                case "diag":
-                    return LogLevel.Trace;
-                default:
-                    return LogLevel.Info;
-            }
-        }
-
         internal static string Sanitize(string name)
         {
             return string.Join("", name.Select(x => Char.IsLetterOrDigit(x) ? x : '_'));

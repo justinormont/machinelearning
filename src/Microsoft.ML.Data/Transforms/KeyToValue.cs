@@ -11,6 +11,7 @@ using Microsoft.ML;
 using Microsoft.ML.CommandLine;
 using Microsoft.ML.Data;
 using Microsoft.ML.Internal.Utilities;
+using Microsoft.ML.Model.OnnxConverter;
 using Microsoft.ML.Model.Pfa;
 using Microsoft.ML.Runtime;
 using Microsoft.ML.Transforms;
@@ -31,10 +32,7 @@ using Newtonsoft.Json.Linq;
 namespace Microsoft.ML.Transforms
 {
     /// <summary>
-    /// KeyToValueTransform utilizes KeyValues metadata to map key indices to the corresponding values in the KeyValues metadata.
-    /// Notes:
-    /// * Output columns utilize the KeyValues metadata.
-    /// * Maps zero values of the key type to the NA of the output type.
+    /// <see cref="ITransformer"/> resulting from fitting a <see cref="KeyToValueMappingEstimator"/>.
     /// </summary>
     public sealed class KeyToValueMappingTransformer : OneToOneTransformerBase
     {
@@ -155,7 +153,7 @@ namespace Microsoft.ML.Transforms
 
         private protected override IRowMapper MakeRowMapper(DataViewSchema inputSchema) => new Mapper(this, inputSchema);
 
-        private sealed class Mapper : OneToOneMapperBase, ISaveAsPfa
+        private sealed class Mapper : OneToOneMapperBase, ISaveAsPfa, ISaveAsOnnx
         {
             private readonly KeyToValueMappingTransformer _parent;
             private readonly DataViewType[] _types;
@@ -301,6 +299,8 @@ namespace Microsoft.ML.Transforms
                 public abstract Delegate GetMappingGetter(DataViewRow input);
 
                 public abstract JToken SavePfa(BoundPfaContext ctx, JToken srcToken);
+
+                public abstract bool SaveOnnx(OnnxContext ctx, string srcVariableName, string dstVariableName);
             }
 
             private class KeyToValueMap<TKey, TValue> : KeyToValueMap
@@ -497,11 +497,86 @@ namespace Microsoft.ML.Transforms
                     }
                     return PfaUtils.If(PfaUtils.Call("<", srcToken, 0), defaultToken, PfaUtils.Index(cellRef, srcToken));
                 }
+
+                public override bool SaveOnnx(OnnxContext ctx, string srcVariableName, string dstVariableName)
+                {
+                    string opType;
+
+                    // Onnx expects the input keys to be int64s. But the input data can come from an ML.NET node that
+                    // may output a uint32. So cast it here to ensure that the data is treated correctly
+                    opType = "Cast";
+                    var castNodeOutput = ctx.AddIntermediateVariable(TypeOutput, "CastNodeOutput", true);
+                    var castNode = ctx.CreateNode(opType, srcVariableName, castNodeOutput, ctx.GetNodeName(opType), "");
+                    var t = InternalDataKindExtensions.ToInternalDataKind(DataKind.Int64).ToType();
+                    castNode.AddAttribute("to", t);
+
+                    opType = "LabelEncoder";
+                    var node = ctx.CreateNode(opType, castNodeOutput, dstVariableName, ctx.GetNodeName(opType));
+                    var keys = Array.ConvertAll<int, long>(Enumerable.Range(1, _values.Length).ToArray(), item => Convert.ToInt64(item));
+                    node.AddAttribute("keys_int64s", keys);
+
+                    if (TypeOutput == NumberDataViewType.Int64)
+                    {
+                        long[] values = Array.ConvertAll<TValue, long>(_values.GetValues().ToArray(), item => Convert.ToInt64(item));
+                        node.AddAttribute("values_int64s", values);
+                    }
+                    else if (TypeOutput == NumberDataViewType.Single)
+                    {
+                        float[] values = Array.ConvertAll<TValue, float>(_values.GetValues().ToArray(), item => Convert.ToSingle(item));
+                        node.AddAttribute("values_floats", values);
+                    }
+                    else if (TypeOutput == TextDataViewType.Instance)
+                    {
+                        string[] values = Array.ConvertAll<TValue, string>(_values.GetValues().ToArray(), item => Convert.ToString(item));
+                        node.AddAttribute("values_strings", values);
+                    }
+                    else
+                        return false;
+
+                    return true;
+                }
             }
 
+            public bool CanSaveOnnx(OnnxContext ctx) => true;
+
+            public void SaveAsOnnx(OnnxContext ctx)
+            {
+                for (int iinfo = 0; iinfo < _parent.ColumnPairs.Length; ++iinfo)
+                {
+                    var info = _parent.ColumnPairs[iinfo];
+                    var inputColumnName = info.inputColumnName;
+
+                    if (!ctx.ContainsColumn(inputColumnName))
+                        continue;
+
+                    var dstVariableName = ctx.AddIntermediateVariable(_types[iinfo], info.outputColumnName, true);
+                    if (!_kvMaps[iinfo].SaveOnnx(ctx, inputColumnName, dstVariableName))
+                    {
+                        ctx.RemoveColumn(inputColumnName, true);
+                    }
+                }
+            }
         }
     }
 
+    /// <summary>
+    /// Estimator for <see cref="KeyToValueMappingTransformer"/>. Converts the key types back to their original values.
+    /// </summary>
+    /// <remarks>
+    /// <format type="text/markdown"><![CDATA[
+    ///
+    /// ###  Estimator Characteristics
+    /// |  |  |
+    /// | -- | -- |
+    /// | Does this estimator need to look at the data to train its parameters? | No |
+    /// | Input column data type | [key](xref:Microsoft.ML.Data.KeyDataViewType) type. |
+    /// | Output column data type | Type of the original data, prior to converting to [key](xref:Microsoft.ML.Data.KeyDataViewType) type. |
+    ///
+    /// Check the See Also section for links to usage examples.
+    /// ]]></format>
+    /// </remarks>
+    /// <seealso cref="ConversionsExtensionsCatalog.MapKeyToValue(TransformsCatalog.ConversionTransforms, InputOutputColumnPair[])"/>
+    /// <seealso cref="ConversionsExtensionsCatalog.MapKeyToValue(TransformsCatalog.ConversionTransforms, string, string)"/>
     public sealed class KeyToValueMappingEstimator : TrivialEstimator<KeyToValueMappingTransformer>
     {
         internal KeyToValueMappingEstimator(IHostEnvironment env, string outputColumnName, string inputColumnName = null)
@@ -533,7 +608,7 @@ namespace Microsoft.ML.Transforms
                     throw Host.ExceptParam(nameof(inputSchema), $"Input column '{colInfo.inputColumnName}' doesn't contain key values metadata");
 
                 SchemaShape metadata = null;
-                if (col.Annotations.TryFindColumn(AnnotationUtils.Kinds.SlotNames, out var slotCol))
+                if (col.HasSlotNames() && col.Annotations.TryFindColumn(AnnotationUtils.Kinds.SlotNames, out var slotCol))
                     metadata = new SchemaShape(new[] { slotCol });
 
                 result[colInfo.outputColumnName] = new SchemaShape.Column(colInfo.outputColumnName, col.Kind, keyMetaCol.ItemType, keyMetaCol.IsKey, metadata);

@@ -5,10 +5,12 @@
 using System;
 using System.Collections.Immutable;
 using System.Linq;
+using Microsoft.ML.Calibrators;
 using Microsoft.ML.Data;
 using Microsoft.ML.Internal.Utilities;
 using Microsoft.ML.RunTests;
 using Microsoft.ML.Trainers;
+using Microsoft.ML.Trainers.FastTree;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -25,12 +27,28 @@ namespace Microsoft.ML.Tests
         /// <summary>
         /// Test PFI Regression for Dense Features
         /// </summary>
-        [Fact]
-        public void TestPfiRegressionOnDenseFeatures()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void TestPfiRegressionOnDenseFeatures(bool saveModel)
         {
             var data = GetDenseDataset();
             var model = ML.Regression.Trainers.OnlineGradientDescent().Fit(data);
-            var pfi = ML.Regression.PermutationFeatureImportance(model, data);
+
+            ImmutableArray<RegressionMetricsStatistics> pfi;
+            if(saveModel)
+            {
+                var modelAndSchemaPath = GetOutputPath("TestPfiRegressionOnDenseFeatures.zip");
+                ML.Model.Save(model, data.Schema, modelAndSchemaPath);
+
+                var loadedModel = ML.Model.Load(modelAndSchemaPath, out var schema);
+                var castedModel = loadedModel as RegressionPredictionTransformer<LinearRegressionModelParameters>;
+                pfi = ML.Regression.PermutationFeatureImportance(castedModel, data);
+            }
+            else
+            {
+                pfi = ML.Regression.PermutationFeatureImportance(model, data);
+            }
 
             // Pfi Indices:
             // X1: 0
@@ -58,12 +76,30 @@ namespace Microsoft.ML.Tests
         /// <summary>
         /// Test PFI Regression Standard Deviation and Standard Error for Dense Features
         /// </summary>
-        [Fact]
-        public void TestPfiRegressionStandardDeviationAndErrorOnDenseFeatures()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void TestPfiRegressionStandardDeviationAndErrorOnDenseFeatures(bool saveModel)
         {
             var data = GetDenseDataset();
             var model = ML.Regression.Trainers.OnlineGradientDescent().Fit(data);
-            var pfi = ML.Regression.PermutationFeatureImportance(model, data, permutationCount: 20);
+
+            ImmutableArray<RegressionMetricsStatistics> pfi;
+
+            if(saveModel)
+            {
+                var modelAndSchemaPath = GetOutputPath("TestPfiRegressionStandardDeviationAndErrorOnDenseFeatures.zip");
+                ML.Model.Save(model, data.Schema, modelAndSchemaPath);
+
+                var loadedModel = ML.Model.Load(modelAndSchemaPath, out var schema);
+                var castedModel = loadedModel as RegressionPredictionTransformer<LinearRegressionModelParameters>;
+                pfi = ML.Regression.PermutationFeatureImportance(castedModel, data, permutationCount: 20);
+            }
+            else
+            {
+                pfi = ML.Regression.PermutationFeatureImportance(model, data, permutationCount: 20);
+            }
+
             // Keep the permutation count high so fluctuations are kept to a minimum
             //  but not high enough to slow down the tests
             //  (fluctuations lead to random test failures)
@@ -110,12 +146,28 @@ namespace Microsoft.ML.Tests
         /// <summary>
         /// Test PFI Regression for Sparse Features
         /// </summary>
-        [Fact]
-        public void TestPfiRegressionOnSparseFeatures()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void TestPfiRegressionOnSparseFeatures(bool saveModel)
         {
             var data = GetSparseDataset();
             var model = ML.Regression.Trainers.OnlineGradientDescent().Fit(data);
-            var results = ML.Regression.PermutationFeatureImportance(model, data);
+
+            ImmutableArray<RegressionMetricsStatistics> results;
+            if(saveModel)
+            {
+                var modelAndSchemaPath = GetOutputPath("TestPfiRegressionOnSparseFeatures.zip");
+                ML.Model.Save(model, data.Schema, modelAndSchemaPath);
+
+                var loadedModel = ML.Model.Load(modelAndSchemaPath, out var schema);
+                var castedModel = loadedModel as RegressionPredictionTransformer<LinearRegressionModelParameters>;
+                results = ML.Regression.PermutationFeatureImportance(castedModel, data);
+            }
+            else
+            {
+                results = ML.Regression.PermutationFeatureImportance(model, data);
+            }
 
             // Pfi Indices:
             // X1: 0
@@ -147,13 +199,29 @@ namespace Microsoft.ML.Tests
         /// <summary>
         /// Test PFI Binary Classification for Dense Features
         /// </summary>
-        [Fact]
-        public void TestPfiBinaryClassificationOnDenseFeatures()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void TestPfiBinaryClassificationOnDenseFeatures(bool saveModel)
         {
             var data = GetDenseDataset(TaskType.BinaryClassification);
             var model = ML.BinaryClassification.Trainers.LbfgsLogisticRegression(
                 new LbfgsLogisticRegressionBinaryTrainer.Options { NumberOfThreads = 1 }).Fit(data);
-            var pfi = ML.BinaryClassification.PermutationFeatureImportance(model, data);
+
+            ImmutableArray<BinaryClassificationMetricsStatistics> pfi;
+            if (saveModel)
+            {
+                var modelAndSchemaPath = GetOutputPath("TestPfiBinaryClassificationOnDenseFeatures.zip");
+                ML.Model.Save(model, data.Schema, modelAndSchemaPath);
+
+                var loadedModel = ML.Model.Load(modelAndSchemaPath, out var schema);
+                var castedModel = loadedModel as BinaryPredictionTransformer<CalibratedModelParametersBase<LinearBinaryModelParameters, PlattCalibrator>>;
+                pfi = ML.BinaryClassification.PermutationFeatureImportance(castedModel, data);
+            }
+            else
+            {
+                pfi = ML.BinaryClassification.PermutationFeatureImportance(model, data);
+            }
 
             // Pfi Indices:
             // X1: 0
@@ -185,13 +253,29 @@ namespace Microsoft.ML.Tests
         /// <summary>
         /// Test PFI Binary Classification for Sparse Features
         /// </summary>
-        [Fact]
-        public void TestPfiBinaryClassificationOnSparseFeatures()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void TestPfiBinaryClassificationOnSparseFeatures(bool saveModel)
         {
             var data = GetSparseDataset(TaskType.BinaryClassification);
             var model = ML.BinaryClassification.Trainers.LbfgsLogisticRegression(
                 new LbfgsLogisticRegressionBinaryTrainer.Options { NumberOfThreads = 1 }).Fit(data);
-            var pfi = ML.BinaryClassification.PermutationFeatureImportance(model, data);
+
+            ImmutableArray<BinaryClassificationMetricsStatistics> pfi;
+            if (saveModel)
+            {
+                var modelAndSchemaPath = GetOutputPath("TestPfiBinaryClassificationOnSparseFeatures.zip");
+                ML.Model.Save(model, data.Schema, modelAndSchemaPath);
+
+                var loadedModel = ML.Model.Load(modelAndSchemaPath, out var schema);
+                var castedModel = loadedModel as BinaryPredictionTransformer<CalibratedModelParametersBase<LinearBinaryModelParameters, PlattCalibrator>>;
+                pfi = ML.BinaryClassification.PermutationFeatureImportance(castedModel, data);
+            }
+            else
+            {
+                pfi = ML.BinaryClassification.PermutationFeatureImportance(model, data);
+            }
 
             // Pfi Indices:
             // X1: 0
@@ -227,12 +311,28 @@ namespace Microsoft.ML.Tests
         /// <summary>
         /// Test PFI Multiclass Classification for Dense Features
         /// </summary>
-        [Fact]
-        public void TestPfiMulticlassClassificationOnDenseFeatures()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void TestPfiMulticlassClassificationOnDenseFeatures(bool saveModel)
         {
             var data = GetDenseDataset(TaskType.MulticlassClassification);
             var model = ML.MulticlassClassification.Trainers.LbfgsMaximumEntropy().Fit(data);
-            var pfi = ML.MulticlassClassification.PermutationFeatureImportance(model, data);
+
+            ImmutableArray<MulticlassClassificationMetricsStatistics> pfi;
+            if(saveModel)
+            {
+                var modelAndSchemaPath = GetOutputPath("TestPfiMulticlassClassificationOnDenseFeatures.zip");
+                ML.Model.Save(model, data.Schema, modelAndSchemaPath);
+
+                var loadedModel = ML.Model.Load(modelAndSchemaPath, out var schema);
+                var castedModel = loadedModel as MulticlassPredictionTransformer<MaximumEntropyModelParameters>;
+                pfi = ML.MulticlassClassification.PermutationFeatureImportance(castedModel, data);
+            }
+            else
+            {
+                pfi = ML.MulticlassClassification.PermutationFeatureImportance(model, data);
+            }
 
             // Pfi Indices:
             // X1: 0
@@ -264,14 +364,29 @@ namespace Microsoft.ML.Tests
         /// <summary>
         /// Test PFI Multiclass Classification for Sparse Features
         /// </summary>
-        [Fact]
-        public void TestPfiMulticlassClassificationOnSparseFeatures()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void TestPfiMulticlassClassificationOnSparseFeatures(bool saveModel)
         {
             var data = GetSparseDataset(TaskType.MulticlassClassification);
             var model = ML.MulticlassClassification.Trainers.LbfgsMaximumEntropy(
                 new LbfgsMaximumEntropyMulticlassTrainer.Options { MaximumNumberOfIterations = 1000 }).Fit(data);
 
-            var pfi = ML.MulticlassClassification.PermutationFeatureImportance(model, data);
+            ImmutableArray<MulticlassClassificationMetricsStatistics> pfi;
+            if(saveModel)
+            {
+                var modelAndSchemaPath = GetOutputPath("TestPfiMulticlassClassificationOnSparseFeatures.zip");
+                ML.Model.Save(model, data.Schema, modelAndSchemaPath);
+
+                var loadedModel = ML.Model.Load(modelAndSchemaPath, out var schema);
+                var castedModel = loadedModel as MulticlassPredictionTransformer<MaximumEntropyModelParameters>;
+                pfi = ML.MulticlassClassification.PermutationFeatureImportance(castedModel, data);
+            }
+            else
+            {
+                pfi = ML.MulticlassClassification.PermutationFeatureImportance(model, data);
+            }
 
             // Pfi Indices:
             // X1: 0
@@ -305,14 +420,31 @@ namespace Microsoft.ML.Tests
 
         #region Ranking Tests
         /// <summary>
-        /// Test PFI Multiclass Classification for Dense Features
+        /// Test PFI Ranking Classification for Dense Features
         /// </summary>
-        [Fact]
-        public void TestPfiRankingOnDenseFeatures()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void TestPfiRankingOnDenseFeatures(bool saveModel)
         {
             var data = GetDenseDataset(TaskType.Ranking);
             var model = ML.Ranking.Trainers.FastTree().Fit(data);
-            var pfi = ML.Ranking.PermutationFeatureImportance(model, data);
+
+            ImmutableArray<RankingMetricsStatistics> pfi;
+            if(saveModel)
+            {
+                var modelAndSchemaPath = GetOutputPath("TestPfiRankingOnDenseFeatures.zip");
+                ML.Model.Save(model, data.Schema, modelAndSchemaPath);
+
+                var loadedModel = ML.Model.Load(modelAndSchemaPath, out var schema);
+                var castedModel = loadedModel as RankingPredictionTransformer<FastTreeRankingModelParameters>;
+                pfi = ML.Ranking.PermutationFeatureImportance(castedModel, data);
+            }
+            else
+            {
+                pfi = ML.Ranking.PermutationFeatureImportance(model, data);
+            }
+
 
             // Pfi Indices:
             // X1: 0 // For Ranking, this column won't result in misorderings
@@ -335,15 +467,32 @@ namespace Microsoft.ML.Tests
             Done();
         }
 
+
         /// <summary>
-        /// Test PFI Multiclass Classification for Sparse Features
+        /// Test PFI Ranking Classification for Sparse Features
         /// </summary>
-        [Fact]
-        public void TestPfiRankingOnSparseFeatures()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void TestPfiRankingOnSparseFeatures(bool saveModel)
         {
             var data = GetSparseDataset(TaskType.Ranking);
             var model = ML.Ranking.Trainers.FastTree().Fit(data);
-            var pfi = ML.Ranking.PermutationFeatureImportance(model, data);
+
+            ImmutableArray<RankingMetricsStatistics> pfi;
+            if(saveModel)
+            {
+                var modelAndSchemaPath = GetOutputPath("TestPfiRankingOnSparseFeatures.zip");
+                ML.Model.Save(model, data.Schema, modelAndSchemaPath);
+
+                var loadedModel = ML.Model.Load(modelAndSchemaPath, out var schema);
+                var castedModel = loadedModel as RankingPredictionTransformer<FastTreeRankingModelParameters>;
+                pfi = ML.Ranking.PermutationFeatureImportance(castedModel, data);
+            }
+            else
+            {
+                pfi = ML.Ranking.PermutationFeatureImportance(model, data);
+            }
 
             // Pfi Indices:
             // X1: 0

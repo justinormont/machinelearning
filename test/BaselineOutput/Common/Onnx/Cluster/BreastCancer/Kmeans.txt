@@ -1,5 +1,5 @@
 {
-  "irVersion": "3",
+  "irVersion": "6",
   "producerName": "ML.NET",
   "producerVersion": "##VERSION##",
   "domain": "machinelearning.dotnet",
@@ -109,7 +109,7 @@
           "Score"
         ],
         "output": [
-          "PredictedLabel"
+          "ArgMinInt64"
         ],
         "name": "ArgMin",
         "opType": "ArgMin",
@@ -122,6 +122,23 @@
           {
             "name": "keepdims",
             "i": "1",
+            "type": "INT"
+          }
+        ]
+      },
+      {
+        "input": [
+          "ArgMinInt64"
+        ],
+        "output": [
+          "PredictedLabel"
+        ],
+        "name": "Cast",
+        "opType": "Cast",
+        "attribute": [
+          {
+            "name": "to",
+            "i": "12",
             "type": "INT"
           }
         ]
@@ -164,7 +181,7 @@
           "4",
           "9"
         ],
-        "dataType": "FLOAT",
+        "dataType": 1,
         "floatData": [
           0.457777977,
           0.123703845,
@@ -209,7 +226,7 @@
         "dims": [
           "4"
         ],
-        "dataType": "FLOAT",
+        "dataType": 1,
         "floatData": [
           0.384200335,
           3.72893953,
@@ -222,7 +239,7 @@
         "dims": [
           "1"
         ],
-        "dataType": "FLOAT",
+        "dataType": 1,
         "floatData": [
           0
         ],
@@ -234,7 +251,7 @@
         "name": "Features",
         "type": {
           "tensorType": {
-            "elemType": "FLOAT",
+            "elemType": 1,
             "shape": {
               "dim": [
                 {
@@ -254,7 +271,7 @@
         "name": "Features1",
         "type": {
           "tensorType": {
-            "elemType": "FLOAT",
+            "elemType": 1,
             "shape": {
               "dim": [
                 {
@@ -272,7 +289,7 @@
         "name": "PredictedLabel0",
         "type": {
           "tensorType": {
-            "elemType": "INT64",
+            "elemType": 12,
             "shape": {
               "dim": [
                 {
@@ -290,7 +307,7 @@
         "name": "Score0",
         "type": {
           "tensorType": {
-            "elemType": "FLOAT",
+            "elemType": 1,
             "shape": {
               "dim": [
                 {
@@ -310,7 +327,7 @@
         "name": "Features0",
         "type": {
           "tensorType": {
-            "elemType": "FLOAT",
+            "elemType": 1,
             "shape": {
               "dim": [
                 {
@@ -329,10 +346,10 @@
   "opsetImport": [
     {
       "domain": "ai.onnx.ml",
-      "version": "1"
+      "version": "2"
     },
     {
-      "version": "7"
+      "version": "9"
     }
   ]
 }

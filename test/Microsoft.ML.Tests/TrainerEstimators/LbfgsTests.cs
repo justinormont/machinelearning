@@ -125,8 +125,8 @@ namespace Microsoft.ML.Tests.TrainerEstimators
             using (var fs = File.OpenRead(modelAndSchemaPath))
                 transformerChain = ML.Model.Load(fs, out var schema);
 
-            var lastTransformer = ((TransformerChain<ITransformer>)transformerChain).LastTransformer as BinaryPredictionTransformer<IPredictorProducing<float>>;
-            var model = lastTransformer.Model as ParameterMixingCalibratedModelParameters<IPredictorProducing<float>, ICalibrator>;
+            var lastTransformer = ((TransformerChain<ITransformer>)transformerChain).LastTransformer as BinaryPredictionTransformer<CalibratedModelParametersBase<LinearBinaryModelParameters, PlattCalibrator>>;
+            var model = lastTransformer.Model;
 
             linearModel = model.SubModel as LinearBinaryModelParameters;
 
@@ -145,7 +145,7 @@ namespace Microsoft.ML.Tests.TrainerEstimators
 
             using (FileStream fs = File.OpenRead(dropModelPath))
             {
-                var result = ModelFileUtils.LoadPredictorOrNull(Env, fs) as ParameterMixingCalibratedModelParameters<IPredictorProducing<float>, ICalibrator>;
+                var result = ModelFileUtils.LoadPredictorOrNull(Env, fs) as CalibratedModelParametersBase<LinearBinaryModelParameters, PlattCalibrator>;
                 var subPredictor = result?.SubModel as LinearBinaryModelParameters;
                 var stats = subPredictor?.Statistics;
 
@@ -215,8 +215,8 @@ namespace Microsoft.ML.Tests.TrainerEstimators
             using (var fs = File.OpenRead(modelAndSchemaPath))
                 transformerChain = ML.Model.Load(fs, out var schema);
 
-            var lastTransformer = ((TransformerChain<ITransformer>)transformerChain).LastTransformer as MulticlassPredictionTransformer<IPredictorProducing<VBuffer<float>>>;
-            model = lastTransformer.Model as MaximumEntropyModelParameters;
+            var lastTransformer = ((TransformerChain<ITransformer>)transformerChain).LastTransformer as MulticlassPredictionTransformer<MaximumEntropyModelParameters>;
+            model = lastTransformer.Model;
 
             validateStats(model);
 

@@ -19,7 +19,11 @@ namespace Microsoft.ML.CodeGenerator.Templates.Console
     /// Class to produce the template output
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "16.0.0.0")]
+<<<<<<< HEAD:src/Microsoft.ML.CodeGenerator/Templates/Console/PredictProject.cs
     public partial class PredictProject : PredictProjectBase
+=======
+    internal partial class PredictProject : PredictProjectBase
+>>>>>>> master:src/mlnet/Templates/Console/PredictProject.cs
     {
         /// <summary>
         /// Create the template output
@@ -28,16 +32,39 @@ namespace Microsoft.ML.CodeGenerator.Templates.Console
         {
             this.Write("<Project Sdk=\"Microsoft.NET.Sdk\">\r\n\r\n  <PropertyGroup>\r\n    <OutputType>Exe</Outp" +
                     "utType>\r\n    <TargetFramework>netcoreapp2.1</TargetFramework>\r\n  </PropertyGroup" +
-                    ">\r\n  <ItemGroup>\r\n    <PackageReference Include=\"Microsoft.ML\" Version=\"1.3.1\" /" +
-                    ">\r\n");
+                    ">\r\n  <ItemGroup>\r\n    <PackageReference Include=\"Microsoft.ML\" Version=\"");
+            this.Write(this.ToStringHelper.ToStringWithCulture(StablePackageVersion));
+            this.Write("\" />\r\n");
  if (IncludeLightGBMPackage){ 
-            this.Write("    <PackageReference Include=\"Microsoft.ML.LightGBM\" Version=\"1.3.1\" />\r\n");
+            this.Write("    <PackageReference Include=\"Microsoft.ML.LightGBM\" Version=\"");
+            this.Write(this.ToStringHelper.ToStringWithCulture(StablePackageVersion));
+            this.Write("\" />\r\n");
 }
  if (IncludeMklComponentsPackage){ 
-            this.Write("    <PackageReference Include=\"Microsoft.ML.Mkl.Components\" Version=\"1.3.1\" />\r\n");
+            this.Write("    <PackageReference Include=\"Microsoft.ML.Mkl.Components\" Version=\"");
+            this.Write(this.ToStringHelper.ToStringWithCulture(StablePackageVersion));
+            this.Write("\" />\r\n");
 }
  if (IncludeFastTreePackage){ 
-            this.Write("    <PackageReference Include=\"Microsoft.ML.FastTree\" Version=\"1.3.1\" />\r\n");
+            this.Write("    <PackageReference Include=\"Microsoft.ML.FastTree\" Version=\"");
+            this.Write(this.ToStringHelper.ToStringWithCulture(StablePackageVersion));
+            this.Write("\" />\r\n");
+}
+ if (IncludeImageTransformerPackage){ 
+            this.Write("    <PackageReference Include=\"Microsoft.ML.ImageAnalytics\" Version=\"");
+            this.Write(this.ToStringHelper.ToStringWithCulture(StablePackageVersion));
+            this.Write("\" />\r\n");
+}
+ if (IncludeImageClassificationPackage){ 
+            this.Write("    <PackageReference Include=\"Microsoft.ML.Vision\" Version=\"");
+            this.Write(this.ToStringHelper.ToStringWithCulture(StablePackageVersion));
+            this.Write("\" />\r\n\t<PackageReference Include=\"SciSharp.TensorFlow.Redist\" Version=\"1.14.0\" />" +
+                    "\r\n");
+}
+ if (IncludeRecommenderPackage){ 
+            this.Write("    <PackageReference Include=\"Microsoft.ML.Recommender\" Version=\"");
+            this.Write(this.ToStringHelper.ToStringWithCulture(UnstablePackageVersion));
+            this.Write("\" />\r\n");
 }
  if (IncludeImageTransformerPackage){ 
             this.Write("    <PackageReference Include=\"Microsoft.ML.DnnImageFeaturizer.ResNet18\" Version=" +
@@ -58,6 +85,13 @@ public bool IncludeLightGBMPackage {get;set;}
 public bool IncludeMklComponentsPackage {get;set;}
 public bool IncludeFastTreePackage {get;set;}
 public bool IncludeImageTransformerPackage {get; set;}
+<<<<<<< HEAD:src/Microsoft.ML.CodeGenerator/Templates/Console/PredictProject.cs
+=======
+public bool IncludeImageClassificationPackage {get; set;}
+public bool IncludeRecommenderPackage {get;set;}
+public string StablePackageVersion {get;set;}
+public string UnstablePackageVersion {get;set;}
+>>>>>>> master:src/mlnet/Templates/Console/PredictProject.cs
 
     }
     #region Base class
@@ -65,7 +99,11 @@ public bool IncludeImageTransformerPackage {get; set;}
     /// Base class for this transformation
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "16.0.0.0")]
+<<<<<<< HEAD:src/Microsoft.ML.CodeGenerator/Templates/Console/PredictProject.cs
     public class PredictProjectBase
+=======
+    internal class PredictProjectBase
+>>>>>>> master:src/mlnet/Templates/Console/PredictProject.cs
     {
         #region Fields
         private global::System.Text.StringBuilder generationEnvironmentField;

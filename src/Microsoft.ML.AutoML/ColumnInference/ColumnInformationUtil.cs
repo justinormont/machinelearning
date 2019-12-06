@@ -4,7 +4,6 @@
 
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.ML.Data;
 
 namespace Microsoft.ML.AutoML
 {
@@ -52,6 +51,21 @@ namespace Microsoft.ML.AutoML
                 return ColumnPurpose.Ignore;
             }
 
+            if (columnName == columnInfo.UserIdColumnName)
+            {
+                return ColumnPurpose.UserId;
+            }
+
+            if (columnName == columnInfo.ItemIdColumnName)
+            {
+                return ColumnPurpose.ItemId;
+            }
+
+            if (columnInfo.ImagePathColumnNames.Contains(columnName))
+            {
+                return ColumnPurpose.ImagePath;
+            }
+
             return null;
         }
 
@@ -81,6 +95,12 @@ namespace Microsoft.ML.AutoML
                     case ColumnPurpose.NumericFeature:
                         columnInfo.NumericColumnNames.Add(column.name);
                         break;
+                    case ColumnPurpose.UserId:
+                        columnInfo.UserIdColumnName = column.name;
+                        break;
+                    case ColumnPurpose.ItemId:
+                        columnInfo.ItemIdColumnName = column.name;
+                        break;
                     case ColumnPurpose.TextFeature:
                         columnInfo.TextColumnNames.Add(column.name);
                         break;
@@ -106,6 +126,8 @@ namespace Microsoft.ML.AutoML
         {
             var columnNames = new List<string>();
             AddStringToListIfNotNull(columnNames, columnInformation.LabelColumnName);
+            AddStringToListIfNotNull(columnNames, columnInformation.UserIdColumnName);
+            AddStringToListIfNotNull(columnNames, columnInformation.ItemIdColumnName);
             AddStringToListIfNotNull(columnNames, columnInformation.ExampleWeightColumnName);
             AddStringToListIfNotNull(columnNames, columnInformation.SamplingKeyColumnName);
             AddStringsToListIfNotNull(columnNames, columnInformation.CategoricalColumnNames);

@@ -4,20 +4,22 @@
 
 using System.IO;
 using System.Text;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Xunit;
 
 namespace Microsoft.ML.AutoML.Test
 {
-    [TestClass]
+    
     public class TextFileSampleTests
     {
-        [TestMethod]
+        [Fact]
         public void CanParseLargeRandomStream()
         {
             using (var stream = new MemoryStream())
             {
                 const int numRows = 100000;
                 const int rowSize = 100;
+
+                var eol = Encoding.UTF8.GetBytes("\r\n");
 
                 for (var i = 0; i < numRows; i++)
                 {
@@ -33,15 +35,15 @@ namespace Microsoft.ML.AutoML.Test
                             row[k] = 1;
                         }
                     }
-                    stream.Write(row);
-                    stream.Write(Encoding.UTF8.GetBytes("\r\n"));
+                    stream.Write(row, 0, rowSize);
+                    stream.Write(eol, 0, eol.Length);
                 }
 
                 stream.Seek(0, SeekOrigin.Begin);
 
                 var sample = TextFileSample.CreateFromFullStream(stream);
-                Assert.IsNotNull(sample);
-                Assert.IsTrue(sample.FullFileSize > 0);
+                Assert.NotNull(sample);
+                Assert.True(sample.FullFileSize > 0);
             }
         }
     }

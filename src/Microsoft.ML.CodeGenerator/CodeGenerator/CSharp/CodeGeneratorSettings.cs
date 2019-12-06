@@ -5,7 +5,7 @@ using Microsoft.ML.AutoML;
 
 namespace Microsoft.ML.CodeGenerator.CSharp
 {
-    public class CodeGeneratorSettings
+    internal class CodeGeneratorSettings
     {
         public CodeGeneratorSettings()
         {
@@ -27,13 +27,17 @@ namespace Microsoft.ML.CodeGenerator.CSharp
 
         public GenerateTarget Target { get; set; }
 
+        public string StablePackageVersion { get; set; }
+
+        public string UnstablePackageVersion { get; set; }
+
         internal TaskKind MlTask { get; set; }
 
     }
 
-    public enum GenerateTarget
+    internal enum GenerateTarget
     {
         ModelBuilder = 0,
         Cli = 1,
-    };
+    }
 }

@@ -6,6 +6,7 @@ using System.Linq;
 using Microsoft.ML.Calibrators;
 using Microsoft.ML.Data;
 using Microsoft.ML.RunTests;
+using Microsoft.ML.TestFrameworkCommon;
 using Microsoft.ML.Trainers;
 using Microsoft.ML.Transforms;
 using Xunit;
@@ -64,7 +65,7 @@ namespace Microsoft.ML.Tests.TrainerEstimators
                 new SdcaNonCalibratedBinaryTrainer.Options { MaximumNumberOfIterations = 100, Shuffle = true, NumberOfThreads = 1 });
 
             pipeline = pipeline.Append(ML.MulticlassClassification.Trainers.PairwiseCoupling(sdcaTrainer))
-                    .Append(ML.Transforms.Conversion.MapKeyToValue("PredictedLabel"));
+                    .Append(ML.Transforms.Conversion.MapKeyToValue("PredictedLabelValue", "PredictedLabel"));
 
             TestEstimatorCore(pipeline, data);
             Done();

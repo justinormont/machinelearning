@@ -10,92 +10,83 @@ resources:
   - container: UbuntuContainer
     image: mcr.microsoft.com/dotnet-buildtools/prereqs:ubuntu-16.04-mlnet-207e097-20190312152303
 
-phases:
-- template: /build/ci/phase-template.yml
+jobs:
+- template: /build/ci/job-template.yml
   parameters:
-    name: core30
-    buildScript: build.cmd
+    name: Centos_x64_NetCoreApp30
+    buildScript: ./build.sh
+    container: CentosContainer
     customMatrixes:
-      Build_Debug_Intrinsics:
-        _configuration: Debug-Intrinsics
+      Debug_Build:
+        _configuration: Debug-netcoreapp3_0
         _config_short: DI
         _includeBenchmarkData: false
-      Build_Release_Intrinsics:
-        _configuration: Release-Intrinsics
+      Release_Build:
+        _configuration: Release-netcoreapp3_0
         _config_short: RI
         _includeBenchmarkData: true
-    queue:
-      name: Hosted VS2017
+    pool:
+      name: Hosted Ubuntu 1604
 
-- template: /build/ci/phase-template.yml
+- template: /build/ci/job-template.yml
   parameters:
-    name: Centos
+    name: Ubuntu_x64_NetCoreApp21
     buildScript: ./build.sh
+    container: UbuntuContainer
+    pool:
+      name: Hosted Ubuntu 1604
+
+- template: /build/ci/job-template.yml
+  parameters:
+    name: MacOS_x64_NetCoreApp21
+    buildScript: ./build.sh
+    pool:
+      name: Hosted macOS High Sierra
+
+- template: /build/ci/job-template.yml
+  parameters:
+    name: Windows_x64_NetCoreApp30
+    buildScript: build.cmd
     customMatrixes:
-      Build_Debug_Intrinsics:
-        _configuration: Debug-Intrinsics
+      Debug_Build:
+        _configuration: Debug-netcoreapp3_0
         _config_short: DI
         _includeBenchmarkData: false
-      Build_Release:
-        _configuration: Release
-        _config_short: R
-        _includeBenchmarkData: true
-    queue:
-      name: Hosted Ubuntu 1604
-      container: CentosContainer
-
-- template: /build/ci/phase-template.yml
-  parameters:
-    name: Ubuntu
-    buildScript: ./build.sh
-    customMatrixes:
-      Build_Debug:
-        _configuration: Debug
-        _config_short: D
-        _includeBenchmarkData: false
-      Build_Release_Intrinsics:
-        _configuration: Release-Intrinsics
+      Release_Build:
+        _configuration: Release-netcoreapp3_0
         _config_short: RI
         _includeBenchmarkData: true
-    queue:
-      name: Hosted Ubuntu 1604
-      container: UbuntuContainer
+    pool:
+      name: NetCorePublic-Pool
+      queue: buildpool.windows.10.amd64.vs2017.open
 
-- template: /build/ci/phase-template.yml
+- template: /build/ci/job-template.yml
   parameters:
-    name: MacOS
-    buildScript: ./build.sh
-    queue:
-      name: Hosted macOS
-
-# TODO: re-enable once we figure out how to not run mlnet in netfx
-# - template: /build/ci/phase-template.yml
-#   parameters:
-#     name: Windows_NetFx
-#     buildScript: build.cmd
-#     customMatrixes:
-#       Build_Debug_netfx:
-#         _configuration: Debug-netfx
-#         _config_short: DFX
-#         _includeBenchmarkData: false
-#       Build_Release_netfx:
-#         _configuration: Release-netfx
-#         _config_short: RFX
-#         _includeBenchmarkData: false
-#     queue:
-#       name: Hosted VS2017
-
-- template: /build/ci/phase-template.yml
-  parameters:
-    name: Windows_x64
+    name: Windows_x64_NetCoreApp21
     buildScript: build.cmd
-    queue:
+    pool:
       name: Hosted VS2017
 
-- template: /build/ci/phase-template.yml
+- template: /build/ci/job-template.yml
   parameters:
-    name: Windows_x86
+    name: Windows_x64_NetFx461
+    buildScript: build.cmd
+    customMatrixes:
+      Debug_Build:
+        _configuration: Debug-netfx
+        _config_short: DFX
+        _includeBenchmarkData: false
+      Release_Build:
+        _configuration: Release-netfx
+        _config_short: RFX
+        _includeBenchmarkData: false
+    pool:
+      name: Hosted VS2017
+
+- template: /build/ci/job-template.yml
+  parameters:
+    name: Windows_x86_NetCoreApp21
     architecture: x86
     buildScript: build.cmd
-    queue:
+    pool:
       name: Hosted VS2017

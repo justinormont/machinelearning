@@ -2,9 +2,8 @@
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), Directory.Build.props))\Directory.Build.props" />
 
   <ItemGroup>
-    <Project Include="$(MSBuildThisFileDirectory)\Microsoft.ML.AutoML.Tests\*.csproj" />
-    <Project Include="$(MSBuildThisFileDirectory)\mlnet.Tests\*.csproj" />
-    <!-- <Project Include="$(MSBuildThisFileDirectory)**\*.fsproj" /> -->
+    <Project Include="$(MSBuildThisFileDirectory)**\*.csproj" Exclude="$(MSBuildThisFileDirectory)Microsoft.ML.NightlyBuild.Tests\Microsoft.ML.NightlyBuild.Tests.csproj"/>
+    <Project Include="$(MSBuildThisFileDirectory)**\*.fsproj" />
   </ItemGroup>
 
   <Target Name="RunTests">

@@ -2,33 +2,18 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <AssemblyName>Microsoft.ML.CodeGenerator</AssemblyName>
-    <Version>0.15.1-preview-28030-3</Version>
-    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <FileVersion>0.15.28030.0</FileVersion>
+    <IncludeInPackage>Microsoft.ML.CodeGenerator</IncludeInPackage>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis" Version="2.10.0" />
-    <PackageReference Include="NLog" Version="4.5.11" />
-    <PackageReference Include="Microsoft.ApplicationInsights" Version="2.9.1" />
-    <PackageReference Include="Microsoft.DotNet.PlatformAbstractions" Version="2.1.0" />
+    <PackageReference Include="System.CodeDom" Version="$(SystemCodeDomPackageVersion)" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="$(MicrosoftCodeAnalysisCSharpVersion)" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Microsoft.ML.AutoML\Microsoft.ML.AutoML.csproj" />
-  </ItemGroup>
-  
   <ItemGroup>
-    <None Update="Templates\Console\Annotation.tt">
-      <Generator>TextTemplatingFileGenerator</Generator>
-      <LastGenOutput>Annotation.txt</LastGenOutput>
-    </None>
-    <None Update="Templates\Console\Annotation.txt">
-      <DesignTime>True</DesignTime>
-      <AutoGen>True</AutoGen>
-      <DependentUpon>Annotation.tt</DependentUpon>
-    </None>
+    <None Update="Templates\Console\Annotation.ttinclude" />
     <None Update="Templates\Console\ConsumeModel.tt">
       <Generator>TextTemplatingFilePreprocessor</Generator>
       <LastGenOutput>ConsumeModel.cs</LastGenOutput>
@@ -110,5 +95,4 @@
       <DependentUpon>ModelOutputClass.tt</DependentUpon>
     </Compile>
   </ItemGroup>
-
 </Project>

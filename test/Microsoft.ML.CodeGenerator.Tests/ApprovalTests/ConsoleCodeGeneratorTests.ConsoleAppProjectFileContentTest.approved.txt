@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp2.1</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+<<<<<<< HEAD:test/mlnet.Tests/ApprovalTests/ConsoleCodeGeneratorTests.ConsoleAppProjectFileContentTest.approved.txt
+    <PackageReference Include="Microsoft.ML" Version="1.3.1" />
+    <PackageReference Include="Microsoft.ML.LightGBM" Version="1.3.1" />
+    <PackageReference Include="Microsoft.ML.Mkl.Components" Version="1.3.1" />
+    <PackageReference Include="Microsoft.ML.DnnImageFeaturizer.ResNet18" Version="0.15.1" />
+    <PackageReference Include="Microsoft.ML.ImageAnalytics" Version="1.3.1" />
+    <PackageReference Include="Microsoft.ML.OnnxTransformer" Version="1.3.1" />
+=======
+    <PackageReference Include="Microsoft.ML" Version="1.4.0-preview3-28229-2" />
+    <PackageReference Include="Microsoft.ML.LightGBM" Version="1.4.0-preview3-28229-2" />
+    <PackageReference Include="Microsoft.ML.Mkl.Components" Version="1.4.0-preview3-28229-2" />
+>>>>>>> master:test/Microsoft.ML.CodeGenerator.Tests/ApprovalTests/ConsoleCodeGeneratorTests.ConsoleAppProjectFileContentTest.approved.txt
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MyNamespace.Model\MyNamespace.Model.csproj" />
+  </ItemGroup>
+</Project>

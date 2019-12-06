@@ -1,11 +1,11 @@
-﻿<#@ template language="C#" linePragmas="false" #>
+﻿﻿<#@ template language="C#" linePragmas="false" visibility="internal" #>
 <#@ assembly name="System.Core" #>
 <#@ import namespace="System.Linq" #>
 <#@ import namespace="System.Text" #>
 <#@ import namespace="System.Text.RegularExpressions" #>
 <#@ import namespace="System.Collections.Generic" #>
 <#@ import namespace="Microsoft.ML.CodeGenerator.Utilities" #>
-<#@ include file="Annotation.tt" #><#if(Target == CSharp.GenerateTarget.Cli){ #>
+<#@ include file="Annotation.ttinclude" #><#if(Target == CSharp.GenerateTarget.Cli){ #>
 <#CLI_Annotation();#>
 <# } else if(Target == CSharp.GenerateTarget.ModelBuilder){ #>
 <#MB_Annotation();#>
@@ -42,7 +42,7 @@ namespace <#= Namespace #>.ConsoleApp
 <#}#>
 <#if("BinaryClassification".Equals(TaskType)){ #>
 			Console.WriteLine($"\n\nActual <#= Utils.Normalize(LabelName) #>: {sampleData.<#= Utils.Normalize(LabelName) #>} \nPredicted <#= Utils.Normalize(LabelName) #>: {predictionResult.Prediction}\n\n");
-<#}else if("Regression".Equals(TaskType)){#>
+<#} else if("Regression".Equals(TaskType) || "Recommendation".Equals(TaskType)){#>
 			Console.WriteLine($"\n\nActual <#= Utils.Normalize(LabelName) #>: {sampleData.<#= Utils.Normalize(LabelName) #>} \nPredicted <#= Utils.Normalize(LabelName) #>: {predictionResult.Score}\n\n");
 <#} else if("MulticlassClassification".Equals(TaskType)){#>
 			Console.WriteLine($"\n\nActual <#= Utils.Normalize(LabelName) #>: {sampleData.<#= Utils.Normalize(LabelName) #>} \nPredicted <#= Utils.Normalize(LabelName) #> value {predictionResult.Prediction} \nPredicted <#= Utils.Normalize(LabelName) #> scores: [{String.Join(",", predictionResult.Score)}]\n\n");
@@ -87,5 +87,5 @@ public bool AllowQuoting {get;set;}
 public bool AllowSparse {get;set;}
 public bool HasHeader {get;set;}
 public IList<string> Features {get;set;}
-public CSharp.GenerateTarget Target {get;set;}
+internal CSharp.GenerateTarget Target {get;set;}
 #>

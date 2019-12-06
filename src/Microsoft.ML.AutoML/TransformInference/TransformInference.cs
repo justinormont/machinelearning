@@ -153,6 +153,12 @@ namespace Microsoft.ML.AutoML
 
             // If numeric column has missing values, use Missing transform.
             yield return new Experts.NumericMissing(context);
+
+            // For recommendation tasks, convert both user and item columns as key
+            yield return new Experts.RecommendationColumns(context);
+
+            // For image columns, use image transforms.
+            yield return new Experts.Image(context);
         }
 
         internal static class Experts
@@ -178,7 +184,31 @@ namespace Microsoft.ML.AutoML
 
                     if (!col.Type.IsKey())
                     {
-                        yield return ValueToKeyMappingExtension.CreateSuggestedTransform(Context, col.ColumnName, col.ColumnName);
+                        yield return ValueToKeyMappingExtension.CreateSuggestedTransform(Context, col.ColumnName,
+                            col.ColumnName);
+                    }
+                }
+            }
+
+            internal sealed class RecommendationColumns : TransformInferenceExpertBase
+            {
+                public RecommendationColumns(MLContext context) : base(context)
+                {
+                }
+
+                public override IEnumerable<SuggestedTransform> Apply(IntermediateColumn[] columns, TaskKind task)
+                {
+                    if (task != TaskKind.Recommendation)
+                    {
+                        yield break;
+                    }
+                    foreach (var column in columns)
+                    {
+                        if (column.Purpose == ColumnPurpose.UserId ||
+                            column.Purpose == ColumnPurpose.ItemId)
+                        {
+                            yield return ValueToKeyMappingExtension.CreateSuggestedTransform(Context, column.ColumnName, column.ColumnName);
+                        }
                     }
                 }
             }
@@ -345,6 +375,26 @@ namespace Microsoft.ML.AutoML
                     }
                 }
             }
+            internal sealed class Image : TransformInferenceExpertBase
+            {
+                public Image(MLContext context) : base(context)
+                {
+                }
+
+                public override IEnumerable<SuggestedTransform> Apply(IntermediateColumn[] columns, TaskKind task)
+                {
+                    foreach (var column in columns)
+                    {
+                        if (!column.Type.GetItemType().IsText() || column.Purpose != ColumnPurpose.ImagePath)
+                            continue;
+
+                        var columnDestSuffix = "_featurized";
+                        string columnDestRenamed = $"{column.ColumnName}{columnDestSuffix}";
+
+                        yield return ImageLoadingExtension.CreateSuggestedTransform(Context, column.ColumnName, columnDestRenamed);
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -363,12 +413,14 @@ namespace Microsoft.ML.AutoML
                 suggestedTransforms.AddRange(suggestions);
             }
 
-            var finalFeaturesConcatTransform = BuildFinalFeaturesConcatTransform(context, suggestedTransforms, intermediateCols);
-            if (finalFeaturesConcatTransform != null)
+            if (task != TaskKind.Recommendation)
             {
-                suggestedTransforms.Add(finalFeaturesConcatTransform);
+                var finalFeaturesConcatTransform = BuildFinalFeaturesConcatTransform(context, suggestedTransforms, intermediateCols);
+                if (finalFeaturesConcatTransform != null)
+                {
+                    suggestedTransforms.Add(finalFeaturesConcatTransform);
+                }
             }
-
             return suggestedTransforms.ToArray();
         }
 
@@ -415,7 +467,8 @@ namespace Microsoft.ML.AutoML
             if (concatColNames.Count() == 1 &&
                 (intermediateCols.First().Type.IsVector() ||
                 intermediateCols.First().Purpose == ColumnPurpose.CategoricalFeature ||
-                intermediateCols.First().Purpose == ColumnPurpose.TextFeature))
+                intermediateCols.First().Purpose == ColumnPurpose.TextFeature ||
+                intermediateCols.First().Purpose == ColumnPurpose.ImagePath))
             {
                 return ColumnCopyingExtension.CreateSuggestedTransform(context, concatColNames.First(), DefaultColumnNames.Features);
             }

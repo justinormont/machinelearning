@@ -4,6 +4,8 @@
 
 using System;
 using System.Collections.Generic;
+using Microsoft.ML.Data;
+using Microsoft.ML.Runtime;
 
 namespace Microsoft.ML.AutoML
 {
@@ -22,7 +24,7 @@ namespace Microsoft.ML.AutoML
         private protected readonly OptimizingMetricInfo OptimizingMetricInfo;
         private protected readonly TExperimentSettings Settings;
 
-        private readonly AutoMLLogger _logger;
+        private readonly IChannel _logger;
         private readonly TaskKind _task;
         private readonly IEnumerable<TrainerName> _trainerWhitelist;
 
@@ -37,7 +39,7 @@ namespace Microsoft.ML.AutoML
             MetricsAgent = metricsAgent;
             OptimizingMetricInfo = optimizingMetricInfo;
             Settings = settings;
-            _logger = new AutoMLLogger(context);
+            _logger = ((IChannelProvider)context).Start("AutoML");
             _task = task;
             _trainerWhitelist = trainerWhitelist;
         }
@@ -100,7 +102,6 @@ namespace Microsoft.ML.AutoML
             const int crossValRowCountThreshold = 15000;
 
             var rowCount = DatasetDimensionsUtil.CountRows(trainData, crossValRowCountThreshold);
-
             if (rowCount < crossValRowCountThreshold)
             {
                 const int numCrossValFolds = 10;
@@ -158,7 +159,9 @@ namespace Microsoft.ML.AutoML
         /// <remarks>
         /// Depending on the size of your data, the AutoML experiment could take a long time to execute.
         /// </remarks>
-        public ExperimentResult<TMetrics> Execute(IDataView trainData, IDataView validationData, ColumnInformation columnInformation, IEstimator<ITransformer> preFeaturizer = null, IProgress<RunDetail<TMetrics>> progressHandler = null)
+        public ExperimentResult<TMetrics> Execute(IDataView trainData, IDataView validationData,
+            ColumnInformation columnInformation, IEstimator<ITransformer> preFeaturizer = null,
+            IProgress<RunDetail<TMetrics>> progressHandler = null)
         {
             if (validationData == null)
             {
@@ -186,7 +189,9 @@ namespace Microsoft.ML.AutoML
         /// <remarks>
         /// Depending on the size of your data, the AutoML experiment could take a long time to execute.
         /// </remarks>
-        public CrossValidationExperimentResult<TMetrics> Execute(IDataView trainData, uint numberOfCVFolds, ColumnInformation columnInformation = null, IEstimator<ITransformer> preFeaturizer = null, IProgress<CrossValidationRunDetail<TMetrics>> progressHandler = null)
+        public CrossValidationExperimentResult<TMetrics> Execute(IDataView trainData, uint numberOfCVFolds,
+            ColumnInformation columnInformation = null, IEstimator<ITransformer> preFeaturizer = null,
+            IProgress<CrossValidationRunDetail<TMetrics>> progressHandler = null)
         {
             UserInputValidationUtil.ValidateNumberOfCVFoldsArg(numberOfCVFolds);
             var splitResult = SplitUtil.CrossValSplit(Context, trainData, numberOfCVFolds, columnInformation?.SamplingKeyColumnName);
