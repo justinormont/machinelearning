@@ -370,7 +370,7 @@ namespace Microsoft.ML.AutoML
         }
     }
 
-    internal class ImageLoadingExtension : IEstimatorExtension
+    internal class RawImageBytesLoadingExtension : IEstimatorExtension
     {
         public static string ImageFolder { private get; set; }
         public IEstimator<ITransformer> CreateInstance(MLContext context, PipelineNode pipelineNode)
@@ -384,7 +384,7 @@ namespace Microsoft.ML.AutoML
             {
                 { "imageFolder", ImageFolder },
             };
-            var pipelineNode = new PipelineNode(EstimatorName.ImageLoading.ToString(), PipelineNodeType.Transform, inColumn, outColumn, pipelineNodeProperty);
+            var pipelineNode = new PipelineNode(EstimatorName.RawImageBytesLoadingExtension.ToString(), PipelineNodeType.Transform, inColumn, outColumn, pipelineNodeProperty);
             var estimator = CreateInstance(context, inColumn, outColumn);
             return new SuggestedTransform(pipelineNode, estimator);
         }

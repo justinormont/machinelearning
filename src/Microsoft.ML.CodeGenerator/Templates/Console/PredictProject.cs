@@ -19,11 +19,7 @@ namespace Microsoft.ML.CodeGenerator.Templates.Console
     /// Class to produce the template output
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "16.0.0.0")]
-<<<<<<< HEAD:src/Microsoft.ML.CodeGenerator/Templates/Console/PredictProject.cs
-    public partial class PredictProject : PredictProjectBase
-=======
     internal partial class PredictProject : PredictProjectBase
->>>>>>> master:src/mlnet/Templates/Console/PredictProject.cs
     {
         /// <summary>
         /// Create the template output
@@ -66,12 +62,6 @@ namespace Microsoft.ML.CodeGenerator.Templates.Console
             this.Write(this.ToStringHelper.ToStringWithCulture(UnstablePackageVersion));
             this.Write("\" />\r\n");
 }
- if (IncludeImageTransformerPackage){ 
-            this.Write("    <PackageReference Include=\"Microsoft.ML.DnnImageFeaturizer.ResNet18\" Version=" +
-                    "\"0.15.1\" />\r\n    <PackageReference Include=\"Microsoft.ML.ImageAnalytics\" Version" +
-                    "=\"1.3.1\" />\r\n    <PackageReference Include=\"Microsoft.ML.OnnxTransformer\" Versio" +
-                    "n=\"1.3.1\" />\r\n");
-}
             this.Write("  </ItemGroup>\r\n  <ItemGroup>\r\n    <ProjectReference Include=\"..\\");
             this.Write(this.ToStringHelper.ToStringWithCulture(Namespace));
             this.Write(".Model\\");
@@ -85,13 +75,10 @@ public bool IncludeLightGBMPackage {get;set;}
 public bool IncludeMklComponentsPackage {get;set;}
 public bool IncludeFastTreePackage {get;set;}
 public bool IncludeImageTransformerPackage {get; set;}
-<<<<<<< HEAD:src/Microsoft.ML.CodeGenerator/Templates/Console/PredictProject.cs
-=======
 public bool IncludeImageClassificationPackage {get; set;}
 public bool IncludeRecommenderPackage {get;set;}
 public string StablePackageVersion {get;set;}
 public string UnstablePackageVersion {get;set;}
->>>>>>> master:src/mlnet/Templates/Console/PredictProject.cs
 
     }
     #region Base class
@@ -99,11 +86,7 @@ public string UnstablePackageVersion {get;set;}
     /// Base class for this transformation
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "16.0.0.0")]
-<<<<<<< HEAD:src/Microsoft.ML.CodeGenerator/Templates/Console/PredictProject.cs
-    public class PredictProjectBase
-=======
     internal class PredictProjectBase
->>>>>>> master:src/mlnet/Templates/Console/PredictProject.cs
     {
         #region Fields
         private global::System.Text.StringBuilder generationEnvironmentField;

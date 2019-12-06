@@ -375,132 +375,112 @@ namespace Microsoft.ML.AutoML
                     }
                 }
             }
-            internal sealed class Image : TransformInferenceExpertBase
+        }
+
+            /// <summary>
+            /// Automatically infer transforms for the data view
+            /// </summary>
+            public static SuggestedTransform[] InferTransforms(MLContext context, TaskKind task, DatasetColumnInfo[] columns)
             {
-                public Image(MLContext context) : base(context)
+                var intermediateCols = columns.Where(c => c.Purpose != ColumnPurpose.Ignore)
+                    .Select(c => new IntermediateColumn(c.Name, c.Type, c.Purpose, c.Dimensions))
+                    .ToArray();
+
+                var suggestedTransforms = new List<SuggestedTransform>();
+                foreach (var expert in GetExperts(context))
                 {
+                    SuggestedTransform[] suggestions = expert.Apply(intermediateCols, task).ToArray();
+                    suggestedTransforms.AddRange(suggestions);
                 }
 
-                public override IEnumerable<SuggestedTransform> Apply(IntermediateColumn[] columns, TaskKind task)
+                if (task != TaskKind.Recommendation)
                 {
-                    foreach (var column in columns)
+                    var finalFeaturesConcatTransform = BuildFinalFeaturesConcatTransform(context, suggestedTransforms, intermediateCols);
+                    if (finalFeaturesConcatTransform != null)
                     {
-                        if (!column.Type.GetItemType().IsText() || column.Purpose != ColumnPurpose.ImagePath)
-                            continue;
-
-                        var columnDestSuffix = "_featurized";
-                        string columnDestRenamed = $"{column.ColumnName}{columnDestSuffix}";
-
-                        yield return ImageLoadingExtension.CreateSuggestedTransform(Context, column.ColumnName, columnDestRenamed);
+                        suggestedTransforms.Add(finalFeaturesConcatTransform);
                     }
                 }
-            }
-        }
-
-        /// <summary>
-        /// Automatically infer transforms for the data view
-        /// </summary>
-        public static SuggestedTransform[] InferTransforms(MLContext context, TaskKind task, DatasetColumnInfo[] columns)
-        {
-            var intermediateCols = columns.Where(c => c.Purpose != ColumnPurpose.Ignore)
-                .Select(c => new IntermediateColumn(c.Name, c.Type, c.Purpose, c.Dimensions))
-                .ToArray();
-
-            var suggestedTransforms = new List<SuggestedTransform>();
-            foreach (var expert in GetExperts(context))
-            {
-                SuggestedTransform[] suggestions = expert.Apply(intermediateCols, task).ToArray();
-                suggestedTransforms.AddRange(suggestions);
+                return suggestedTransforms.ToArray();
             }
 
-            if (task != TaskKind.Recommendation)
+            /// <summary>
+            /// Build final features concat transform, using output of all suggested experts.
+            /// Take the output columns from all suggested experts (except for 'Label'), and concatenate them
+            /// into one final 'Features' column that a trainer will accept.
+            /// </summary>
+            private static SuggestedTransform BuildFinalFeaturesConcatTransform(MLContext context, IEnumerable<SuggestedTransform> suggestedTransforms,
+                IEnumerable<IntermediateColumn> intermediateCols)
             {
-                var finalFeaturesConcatTransform = BuildFinalFeaturesConcatTransform(context, suggestedTransforms, intermediateCols);
-                if (finalFeaturesConcatTransform != null)
+                // Get the output column names from all suggested transforms
+                var concatColNames = new List<string>();
+                foreach (var suggestedTransform in suggestedTransforms)
                 {
-                    suggestedTransforms.Add(finalFeaturesConcatTransform);
-                }
-            }
-            return suggestedTransforms.ToArray();
-        }
-
-        /// <summary>
-        /// Build final features concat transform, using output of all suggested experts.
-        /// Take the output columns from all suggested experts (except for 'Label'), and concatenate them
-        /// into one final 'Features' column that a trainer will accept.
-        /// </summary>
-        private static SuggestedTransform BuildFinalFeaturesConcatTransform(MLContext context, IEnumerable<SuggestedTransform> suggestedTransforms,
-            IEnumerable<IntermediateColumn> intermediateCols)
-        {
-            // Get the output column names from all suggested transforms
-            var concatColNames = new List<string>();
-            foreach (var suggestedTransform in suggestedTransforms)
-            {
-                concatColNames.AddRange(suggestedTransform.PipelineNode.OutColumns);
-            }
-
-            // Include all numeric columns of type R4
-            foreach(var intermediateCol in intermediateCols)
-            {
-                if (intermediateCol.Purpose == ColumnPurpose.NumericFeature &&
-                    intermediateCol.Type.GetItemType() == NumberDataViewType.Single)
-                {
-                    concatColNames.Add(intermediateCol.ColumnName);
-                }
-            }
-
-            // Remove column with 'Label' purpose
-            var labelColumnName = intermediateCols.FirstOrDefault(c => c.Purpose == ColumnPurpose.Label)?.ColumnName;
-            concatColNames.Remove(labelColumnName);
-
-            intermediateCols = intermediateCols.Where(c => c.Purpose == ColumnPurpose.NumericFeature ||
-                c.Purpose == ColumnPurpose.CategoricalFeature || c.Purpose == ColumnPurpose.TextFeature ||
-                c.Purpose == ColumnPurpose.ImagePath);
-
-            if (!concatColNames.Any() || (concatColNames.Count == 1 &&
-                concatColNames[0] == DefaultColumnNames.Features &&
-                intermediateCols.First().Type.IsVector()))
-            {
-                return null;
-            }
-
-            if (concatColNames.Count() == 1 &&
-                (intermediateCols.First().Type.IsVector() ||
-                intermediateCols.First().Purpose == ColumnPurpose.CategoricalFeature ||
-                intermediateCols.First().Purpose == ColumnPurpose.TextFeature ||
-                intermediateCols.First().Purpose == ColumnPurpose.ImagePath))
-            {
-                return ColumnCopyingExtension.CreateSuggestedTransform(context, concatColNames.First(), DefaultColumnNames.Features);
-            }
-
-            return ColumnConcatenatingExtension.CreateSuggestedTransform(context, concatColNames.Distinct().ToArray(), DefaultColumnNames.Features);
-        }
-
-        private static IEnumerable<string> GetNewColumnNames(IEnumerable<string> desiredColNames, IEnumerable<IntermediateColumn> columns)
-        {
-            var newColNames = new List<string>();
-
-            var existingColNames = new HashSet<string>(columns.Select(c => c.ColumnName));
-            foreach (var desiredColName in desiredColNames)
-            {
-                if (!existingColNames.Contains(desiredColName))
-                {
-                    newColNames.Add(desiredColName);
-                    continue;
+                    concatColNames.AddRange(suggestedTransform.PipelineNode.OutColumns);
                 }
 
-                for(var i = 0; ; i++)
+                // Include all numeric columns of type R4
+                foreach (var intermediateCol in intermediateCols)
                 {
-                    var newColName = $"{desiredColName}{i}";
-                    if (!existingColNames.Contains(newColName))
+                    if (intermediateCol.Purpose == ColumnPurpose.NumericFeature &&
+                        intermediateCol.Type.GetItemType() == NumberDataViewType.Single)
                     {
-                        newColNames.Add(newColName);
-                        break;
+                        concatColNames.Add(intermediateCol.ColumnName);
                     }
                 }
+
+                // Remove column with 'Label' purpose
+                var labelColumnName = intermediateCols.FirstOrDefault(c => c.Purpose == ColumnPurpose.Label)?.ColumnName;
+                concatColNames.Remove(labelColumnName);
+
+                intermediateCols = intermediateCols.Where(c => c.Purpose == ColumnPurpose.NumericFeature ||
+                    c.Purpose == ColumnPurpose.CategoricalFeature || c.Purpose == ColumnPurpose.TextFeature ||
+                    c.Purpose == ColumnPurpose.ImagePath);
+
+                if (!concatColNames.Any() || (concatColNames.Count == 1 &&
+                    concatColNames[0] == DefaultColumnNames.Features &&
+                    intermediateCols.First().Type.IsVector()))
+                {
+                    return null;
+                }
+
+                if (concatColNames.Count() == 1 &&
+                    (intermediateCols.First().Type.IsVector() ||
+                    intermediateCols.First().Purpose == ColumnPurpose.CategoricalFeature ||
+                    intermediateCols.First().Purpose == ColumnPurpose.TextFeature ||
+                    intermediateCols.First().Purpose == ColumnPurpose.ImagePath))
+                {
+                    return ColumnCopyingExtension.CreateSuggestedTransform(context, concatColNames.First(), DefaultColumnNames.Features);
+                }
+
+                return ColumnConcatenatingExtension.CreateSuggestedTransform(context, concatColNames.Distinct().ToArray(), DefaultColumnNames.Features);
             }
 
-            return newColNames;
+            private static IEnumerable<string> GetNewColumnNames(IEnumerable<string> desiredColNames, IEnumerable<IntermediateColumn> columns)
+            {
+                var newColNames = new List<string>();
+
+                var existingColNames = new HashSet<string>(columns.Select(c => c.ColumnName));
+                foreach (var desiredColName in desiredColNames)
+                {
+                    if (!existingColNames.Contains(desiredColName))
+                    {
+                        newColNames.Add(desiredColName);
+                        continue;
+                    }
+
+                    for (var i = 0; ; i++)
+                    {
+                        var newColName = $"{desiredColName}{i}";
+                        if (!existingColNames.Contains(newColName))
+                        {
+                            newColNames.Add(newColName);
+                            break;
+                        }
+                    }
+                }
+
+                return newColNames;
+            }
         }
     }
-}

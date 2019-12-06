@@ -10,7 +10,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.ML.AutoML;
 using Microsoft.ML.Data;
-using NLog;
 namespace Microsoft.ML.CodeGenerator.Utilities
 {
     internal class Utils

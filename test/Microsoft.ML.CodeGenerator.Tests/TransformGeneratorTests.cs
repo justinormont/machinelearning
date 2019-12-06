@@ -179,8 +179,8 @@ namespace mlnet.Tests
             CodeGenerator codeGenerator = new CodeGenerator(pipeline, null, null);
             var actual = codeGenerator.GenerateTransformsAndUsings(new PipelineNode[] { node });
             string expectedTransform = "LoadImages(\"Label\", @\"C:\\\\Test\", \"Label\")";
-            Assert.AreEqual(expectedTransform, actual[0].Item1);
-            Assert.IsNull(actual[0].Item2);
+            Assert.Equal(expectedTransform, actual[0].Item1);
+            Assert.Null(actual[0].Item2);
         }
 
         [Fact]
@@ -197,8 +197,8 @@ namespace mlnet.Tests
             CodeGenerator codeGenerator = new CodeGenerator(pipeline, null, null);
             var actual = codeGenerator.GenerateTransformsAndUsings(new PipelineNode[] { node });
             string expectedTransform = "ResizeImages(\"Label\", 224, 224, \"Label\")";
-            Assert.AreEqual(expectedTransform, actual[0].Item1);
-            Assert.IsNull(actual[0].Item2);
+            Assert.Equal(expectedTransform, actual[0].Item1);
+            Assert.Null(actual[0].Item2);
         }
 
         [Fact]
@@ -210,8 +210,8 @@ namespace mlnet.Tests
             CodeGenerator codeGenerator = new CodeGenerator(pipeline, null, null);
             var actual = codeGenerator.GenerateTransformsAndUsings(new PipelineNode[] { node });
             string expectedTransform = "ExtractPixels(\"Label\", \"Label\")";
-            Assert.AreEqual(expectedTransform, actual[0].Item1);
-            Assert.IsNull(actual[0].Item2);
+            Assert.Equal(expectedTransform, actual[0].Item1);
+            Assert.Null(actual[0].Item2);
         }
 
         [Fact]
@@ -223,18 +223,6 @@ namespace mlnet.Tests
             CodeGenerator codeGenerator = new CodeGenerator(pipeline, null, null);
             var actual = codeGenerator.GenerateTransformsAndUsings(new PipelineNode[] { node });
             string expectedTransform = "DnnFeaturizeImage(\"Label\", m => m.ModelSelector.ResNet18(mlContext, m.OutputColumn, m.InputColumn), \"Label\")";
-            Assert.AreEqual(expectedTransform, actual[0].Item1);
-            Assert.IsNull(actual[0].Item2);
-        [Fact]
-        public void ImageLoadingTest()
-        {
-            PipelineNode node = new PipelineNode("ImageLoading", PipelineNodeType.Transform,
-                new string[] { "Label" }, new string[] { "Label" }, null);
-
-            Pipeline pipeline = new Pipeline(new PipelineNode[] { node });
-            CodeGenerator codeGenerator = new CodeGenerator(pipeline, null, null);
-            var actual = codeGenerator.GenerateTransformsAndUsings(new PipelineNode[] { node });
-            string expectedTransform = "LoadRawImageBytes(\"Label\", null, \"Label\")";
             Assert.Equal(expectedTransform, actual[0].Item1);
             Assert.Null(actual[0].Item2);
         }

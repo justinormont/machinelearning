@@ -24,7 +24,7 @@ namespace Microsoft.ML.AutoML
         ResNet18Featurizing,
         TypeConverting,
         ValueToKeyMapping,
-        ImageLoading
+        RawImageBytesLoadingExtension
     }
 
     internal class EstimatorExtensionCatalog
@@ -47,7 +47,7 @@ namespace Microsoft.ML.AutoML
             { EstimatorName.ResNet18Featurizing, typeof(ResNet18FeaturizingExtension) },
             { EstimatorName.TypeConverting, typeof(TypeConvertingExtension) },
             { EstimatorName.ValueToKeyMapping, typeof(ValueToKeyMappingExtension) },
-            { EstimatorName.ImageLoading, typeof(ImageLoadingExtension) }
+            { EstimatorName.RawImageBytesLoadingExtension, typeof(RawImageBytesLoadingExtension) },
         };
 
         public static IEstimatorExtension GetExtension(EstimatorName estimatorName)
