@@ -1,0 +1,74 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>FinalPublicKey.snk</AssemblyOriginatorKeyFile>
+    <DelaySign>true</DelaySign>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <LangVersion>7.3</LangVersion>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <CodeAnalysisRuleSet />
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningsAsErrors />
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <CodeAnalysisRuleSet />
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Azure.Management.Fluent" Version="1.26.0" />
+    <PackageReference Include="Microsoft.Azure.Management.ResourceManager" Version="2.4.1-preview" />
+    <PackageReference Include="Microsoft.Data.DataFrame" Version="0.1.1-e190917-2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="3.1.1" />
+    <PackageReference Include="Nerdbank.Streams" Version="2.1.37" />
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
+    <PackageReference Include="StreamJsonRpc" Version="1.3.23" />
+    <PackageReference Include="Microsoft.VisualStudioEng.MicroBuild.Core">
+      <Version>0.4.1</Version>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="SciSharp.TensorFlow.Redist" Version="1.14.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FilesToSign Include="$(OutDir)\Microsoft.ML.ModelBuilder.AutoMLService.dll">
+      <Authenticode>Microsoft400</Authenticode>
+      <StrongName>StrongName</StrongName>
+    </FilesToSign>
+    <FilesToSign Include="$(IntermediateOutputPath)\Microsoft.ML.ModelBuilder.AutoMLService.dll">
+      <Authenticode>Microsoft400</Authenticode>
+      <StrongName>StrongName</StrongName>
+    </FilesToSign>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Microsoft.ML.AutoML\Microsoft.ML.AutoML.csproj" />
+    <ProjectReference Include="..\Microsoft.ML.AzureMLClient\Microsoft.ML.AzureMLClient.csproj" />
+    <ProjectReference Include="..\Microsoft.ML.CodeGenerator\Microsoft.ML.CodeGenerator.csproj" />
+    <ProjectReference Include="..\Microsoft.ML.DnnImageFeaturizer.ResNet18\Microsoft.ML.DnnImageFeaturizer.ResNet18.csproj" />
+    <ProjectReference Include="..\Microsoft.ML.Experimental\Microsoft.ML.Experimental.csproj" />
+    <ProjectReference Include="..\Microsoft.ML.ModelBuilder.AutoMLService.Contract\Microsoft.ML.ModelBuilder.AutoMLService.Contract.csproj">
+      <Private>true</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Microsoft.ML.ModelBuilder.AzCopyService.Contract\Microsoft.ML.ModelBuilder.AzCopyService.Contract.csproj">
+      <Private>true</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Microsoft.ML.ModelBuilder.AzCopyService\Microsoft.ML.ModelBuilder.AzCopyService.csproj" />
+  </ItemGroup>
+
+  <Target Name="FilesToPublishOutputGroup" DependsOnTargets="ComputeFilesToPublish" Outputs="@(FilesToPublishOutput)">
+    <ItemGroup>
+      <FilesToPublishOutput Include="@(ResolvedFileToPublish)">
+        <TargetPath Condition="'%(ResolvedFileToPublish.DestinationSubPath)' != ''">%(ResolvedFileToPublish.DestinationSubPath)</TargetPath>
+      </FilesToPublishOutput>
+    </ItemGroup>
+  </Target>
+</Project>
